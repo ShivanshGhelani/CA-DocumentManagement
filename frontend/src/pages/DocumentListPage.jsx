@@ -1,0 +1,503 @@
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { documentsAPI, tagsAPI } from '../services/api';
+import { useNavigate } from 'react-router';
+
+// Debounce hook
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+export default function DocumentListPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    file_type: '',
+    created_by: '',
+    created_date_from: '',
+    created_date_to: '',
+    tags: []
+  });
+
+  const [searchInput, setSearchInput] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [selectedTags, setSelectedTags] = useState([]);
+
+  // Debounce search input
+  const debouncedSearch = useDebounce(searchInput, 500);
+
+  // Update filters when debounced search changes
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, search: debouncedSearch }));
+  }, [debouncedSearch]);
+  const { data: documentsData, isLoading, error } = useQuery({
+    queryKey: ['documents', filters],
+    queryFn: () => documentsAPI.getDocuments(filters),
+    keepPreviousData: true,
+  });
+  // Fetch available tags for filter
+  const { data: availableTags } = useQuery({
+    queryKey: ['tags'],
+    queryFn: tagsAPI.getTags,
+  });
+
+  // Get unique creators for filter dropdown
+  const uniqueCreators = documentsData?.results ? 
+    [...new Set(documentsData.results.map(doc => doc.created_by?.email).filter(Boolean))] : [];
+
+  // Ensure availableTags is an array
+  const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);// Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: documentsAPI.deleteDocument,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      setDeleteModalOpen(false);
+      setDocumentToDelete(null);
+    },
+    onError: (error) => {
+      console.error('Delete error:', error);
+      alert('Failed to delete document. Please try again.');
+    },
+  });
+
+  // Download mutation
+  const downloadMutation = useMutation({
+    mutationFn: documentsAPI.downloadDocument,
+    onSuccess: (data) => {
+      // Open download URL in new tab
+      window.open(data.download_url, '_blank');
+    },
+  });
+  const handleDeleteClick = (document) => {
+    setDocumentToDelete(document);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (documentToDelete) {
+      deleteMutation.mutate(documentToDelete.id);
+    }
+  };
+  const handleDownload = (documentId) => {
+    downloadMutation.mutate(documentId);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleTagSelect = (tag) => {
+    if (!selectedTags.find(t => t.id === tag.id)) {
+      const newTags = [...selectedTags, tag];
+      setSelectedTags(newTags);
+      setFilters(prev => ({ ...prev, tags: newTags.map(t => t.id) }));
+    }
+  };
+
+  const handleTagRemove = (tagId) => {
+    const newTags = selectedTags.filter(t => t.id !== tagId);
+    setSelectedTags(newTags);
+    setFilters(prev => ({ ...prev, tags: newTags.map(t => t.id) }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: '',
+      file_type: '',
+      created_by: '',
+      created_date_from: '',
+      created_date_to: '',
+      tags: []
+    });
+    setSearchInput('');
+    setSelectedTags([]);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-8">        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Document Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage and organize your documents</p>
+          </div>
+          <button
+            onClick={() => navigate('/documents/create')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Upload Document
+          </button>
+        </div>        {/* Search and Filters */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search documents by title, content, or description..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Filters Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Created By Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
+                <select
+                  value={filters.created_by}
+                  onChange={(e) => handleFilterChange('created_by', e.target.value)}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Users</option>
+                  {uniqueCreators.map((creator) => (
+                    <option key={creator} value={creator}>
+                      {creator}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+
+              {/* Date From */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created From</label>
+                <input
+                  type="date"
+                  value={filters.created_date_from}
+                  onChange={(e) => handleFilterChange('created_date_from', e.target.value)}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Date To */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created To</label>
+                <input
+                  type="date"
+                  value={filters.created_date_to}
+                  onChange={(e) => handleFilterChange('created_date_to', e.target.value)}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>            {/* Tags Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Tags</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {tagsArray.length > 0 ? (
+                  tagsArray.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => handleTagSelect(tag)}
+                      disabled={selectedTags.find(t => t.id === tag.id)}
+                      className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                        selectedTags.find(t => t.id === tag.id)
+                          ? 'bg-blue-100 text-blue-800 border-blue-300 cursor-not-allowed'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tag.name}
+                    </button>
+                  ))
+                ) : (
+                  <span className="text-gray-400 text-sm">No tags available</span>
+                )}
+              </div>
+              
+              {/* Selected Tags */}
+              {selectedTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                    >
+                      {tag.name}
+                      <button
+                        onClick={() => handleTagRemove(tag.id)}
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Clear Filters Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium"
+              >
+                Clear All Filters
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Results */}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            Failed to load documents. Please try again.
+          </div>
+        ) : (
+          <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Document Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tags
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Owner
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Created At
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Version
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {documentsData?.results?.map((doc) => (
+                    <tr key={doc.id} className="hover:bg-gray-50">                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button 
+                          onClick={() => navigate(`/documents/${doc.id}`)}
+                          className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+                        >
+                          {doc.title}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-wrap gap-1">
+                          {doc.tags && doc.tags.length > 0 ? (
+                            doc.tags.map((tag, idx) => (
+                              <span 
+                                key={idx} 
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {tag.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 text-sm">No tags</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {doc.created_by?.email || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(doc.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          v{doc.version || '1.0'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            doc.status === 'published' 
+                              ? 'bg-green-100 text-green-800' 
+                              : doc.status === 'draft' 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {doc.status}
+                        </span>
+                      </td><td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-1">                          {/* View Button */}
+                          <button
+                            onClick={() => navigate(`/documents/${doc.id}`)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                            title="View document details"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View
+                          </button>
+
+                          {/* Edit Button */}
+                          <button
+                            onClick={() => navigate(`/documents/${doc.id}/edit`)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
+                            title="Edit document"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+
+                          {/* Download Button */}                          <button
+                            onClick={() => handleDownload(doc.id)}
+                            disabled={downloadMutation.isPending}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+                            title="Download document"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {downloadMutation.isPending ? 'Downloading...' : 'Download'}
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteClick(doc)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                            title="Delete document"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>            </div>
+            
+            {/* No Documents Found Alert */}
+            {documentsData?.results?.length === 0 && (
+              <div className="text-center py-16">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">No documents found</h3>
+                <p className="mt-2 text-gray-500">
+                  {filters.search || filters.status || filters.created_by || selectedTags.length > 0
+                    ? "Try adjusting your search criteria or filters to find what you're looking for."
+                    : "Get started by uploading your first document."
+                  }
+                </p>
+                <div className="mt-6">
+                  {filters.search || filters.status || filters.created_by || selectedTags.length > 0 ? (
+                    <button
+                      onClick={clearFilters}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Clear all filters
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => navigate('/documents/create')}
+                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Upload your first document
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Confirm Delete</h3>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-700">
+                  Are you sure you want to delete "{documentToDelete?.title}"? This action cannot be undone.
+                </p>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">                <button
+                  onClick={() => setDeleteModalOpen(false)}
+                  disabled={deleteMutation.isPending}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  disabled={deleteMutation.isPending}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-md transition-colors"
+                >
+                  {deleteMutation.isPending ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
