@@ -364,10 +364,11 @@ export default function DocumentListPage() {
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {doc.status}
-                        </span>
-                      </td><td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-1">                          {/* View Button */}
+                          {doc.status}                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-1">
+                          {/* View Button */}
                           <button
                             onClick={() => navigate(`/documents/${doc.id}`)}
                             className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -379,7 +380,6 @@ export default function DocumentListPage() {
                             </svg>
                             View
                           </button>
-
                           {/* Edit Button */}
                           <button
                             onClick={() => navigate(`/documents/${doc.id}/edit`)}
@@ -391,8 +391,8 @@ export default function DocumentListPage() {
                             </svg>
                             Edit
                           </button>
-
-                          {/* Download Button */}                          <button
+                          {/* Download Button */}
+                          <button
                             onClick={() => handleDownload(doc.id)}
                             disabled={downloadMutation.isPending}
                             className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
@@ -403,7 +403,6 @@ export default function DocumentListPage() {
                             </svg>
                             {downloadMutation.isPending ? 'Downloading...' : 'Download'}
                           </button>
-
                           {/* Delete Button */}
                           <button
                             onClick={() => handleDeleteClick(doc)}
@@ -420,7 +419,8 @@ export default function DocumentListPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>            </div>
+              </table>
+            </div>
             
             {/* No Documents Found Alert */}
             {documentsData?.results?.length === 0 && (

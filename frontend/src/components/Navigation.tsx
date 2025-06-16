@@ -1,18 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
+
+interface User {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+}
 
 export default function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || 'null') : null;
-  const isAuthenticated = typeof window !== 'undefined' && !!localStorage.getItem('access_token');
+  const [isClient, setIsClient] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('access_token');
+    setUser(storedUser ? JSON.parse(storedUser) : null);
+    setIsAuthenticated(!!token);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
+    setUser(null);
+    setIsAuthenticated(false);
     navigate('/signin');
   };
 
