@@ -1,22 +1,20 @@
-FROM node:20-alpine AS development-dependencies-env
-COPY . /app
+# Development Dockerfile for hot reloading
+FROM node:20-alpine
+
+# Set working directory
 WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
 RUN npm ci
 
-FROM node:20-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
-WORKDIR /app
-RUN npm ci --omit=dev
+# Copy app source (this will be overridden by volume mount)
+COPY . .
 
-FROM node:20-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
-WORKDIR /app
-RUN npm run build
+# Expose port
+EXPOSE 3000
 
-FROM node:20-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
-WORKDIR /app
-CMD ["npm", "run", "start"]
+# Start development server with hot reloading
+CMD ["npm", "run", "dev"]

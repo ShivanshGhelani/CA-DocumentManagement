@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="user",
             name="hear_about",
-            field=models.CharField(blank=True, max_length=200),
+            field=models.CharField(blank=True, null=True, max_length=200),
         ),
         migrations.AddField(
             model_name="user",
