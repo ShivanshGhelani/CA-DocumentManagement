@@ -176,8 +176,7 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
         
         # Log document update
         AuditLog.log_activity(
-            user=self.request.user,
-            action='update',
+            user=self.request.user,            action='update',
             resource_type='document',
             resource_id=str(document.id),
             resource_name=document.title,
@@ -190,17 +189,18 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
         if not self._can_delete(instance):
             raise Http404("You don't have permission to delete this document")
         
+        # Perform soft delete instead of hard delete
+        instance.soft_delete(self.request.user)
+        
         # Log document deletion
         AuditLog.log_activity(
             user=self.request.user,
-            action='delete',
+            action='soft_delete',
             resource_type='document',
             resource_id=str(instance.id),
             resource_name=instance.title,
             request=self.request
         )
-        
-        instance.delete()
     
     def _can_edit(self, document):
         user = self.request.user
@@ -369,3 +369,72 @@ def document_share(request, pk):
             {'error': 'Document not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def restore_document(request, pk):
+    """Restore a soft-deleted document"""
+    try:
+        # Get document from all documents including deleted ones
+        document = Document.objects.all_with_deleted().get(pk=pk, is_deleted=True)
+        
+        # Check restore permissions (only owner or admin can restore)
+        user = request.user
+        if document.created_by != user:
+            access = document.access_permissions.filter(
+                user=user,
+                permission='admin'
+            ).first()
+            if not access:
+                return Response(
+                    {'error': 'Permission denied'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Restore the document
+        document.restore()
+        
+        # Log restore action
+        AuditLog.log_activity(
+            user=user,
+            action='restore',
+            resource_type='document',
+            resource_id=str(document.id),
+            resource_name=document.title,
+            content_object=document,
+            request=request
+        )
+        
+        return Response({'message': 'Document restored successfully'})
+        
+    except Document.DoesNotExist:
+        return Response(
+            {'error': 'Document not found or not deleted'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def deleted_documents(request):
+    """List soft-deleted documents for the current user"""
+    user = request.user
+    deleted_docs = Document.objects.deleted_only().filter(created_by=user)
+    
+    documents_data = []
+    for doc in deleted_docs:
+        documents_data.append({
+            'id': str(doc.id),
+            'title': doc.title,
+            'description': doc.description,
+            'deleted_at': doc.deleted_at,
+            'deleted_by': doc.deleted_by.email if doc.deleted_by else None,
+        })
+    
+    return Response(documents_data)

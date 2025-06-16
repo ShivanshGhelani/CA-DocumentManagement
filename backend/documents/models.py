@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import FileExtensionValidator
+from django.utils import timezone
 import uuid
 import os
 
@@ -12,6 +13,22 @@ def document_upload_path(instance, filename):
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     return os.path.join('documents', str(instance.created_by.id), filename)
+
+
+class DocumentManager(models.Manager):
+    """Custom manager for Document model with soft delete support"""
+    
+    def get_queryset(self):
+        """Return only non-deleted documents by default"""
+        return super().get_queryset().filter(is_deleted=False)
+    
+    def all_with_deleted(self):
+        """Return all documents including deleted ones"""
+        return super().get_queryset()
+    
+    def deleted_only(self):
+        """Return only deleted documents"""
+        return super().get_queryset().filter(is_deleted=True)
 
 
 class Tag(models.Model):
@@ -56,16 +73,44 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # Soft delete fields
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='deleted_documents'
+    )
+    
+    # Custom manager
+    objects = DocumentManager()
+    
     class Meta:
         ordering = ['-updated_at']
         unique_together = ['title', 'created_by']
-    
+
+    def soft_delete(self, user):
+        """Soft delete the document"""
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.deleted_by = user
+        self.save()
+
+    def restore(self):
+        """Restore a soft-deleted document"""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save()
+
     def save(self, *args, **kwargs):
         if self.file:
             self.file_size = self.file.size
             self.file_type = self.file.name.split('.')[-1].lower()
         super().save(*args, **kwargs)
-    
+
     def __str__(self):
         return f"{self.title} (v{self.version})"
 

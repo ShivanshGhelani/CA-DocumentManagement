@@ -123,9 +123,21 @@ export const documentsAPI = {
     return response.data;
   },
 
-  // Delete document
+  // Delete document (soft delete)
   deleteDocument: async (id) => {
     const response = await apiClient.delete(`/documents/${id}/`);
+    return response.data;
+  },
+
+  // Restore deleted document
+  restoreDocument: async (id) => {
+    const response = await apiClient.post(`/documents/${id}/restore/`);
+    return response.data;
+  },
+
+  // Get deleted documents
+  getDeletedDocuments: async () => {
+    const response = await apiClient.get('/documents/deleted/');
     return response.data;
   },
 
