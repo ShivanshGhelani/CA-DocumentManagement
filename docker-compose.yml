@@ -12,6 +12,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
   backend:
     build:
       context: ./backend
@@ -28,8 +29,23 @@ services:
     volumes:
       - ./backend:/app
       - /app/__pycache__
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+            - "*.pyo"
+            - "*.pyd"
+            - ".pytest_cache/"
+            - ".coverage"
+        - action: rebuild
+          path: ./backend/requirements.txt
     depends_on:
       - db
+
   frontend:
     build:
       context: ./frontend
@@ -41,6 +57,19 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .git/
+            - "*.log"
+            - dist/
+            - build/
+        - action: rebuild
+          path: ./frontend/package.json
     depends_on:
       - backend
   adminer:
