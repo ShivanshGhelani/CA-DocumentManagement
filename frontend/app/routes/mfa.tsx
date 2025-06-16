@@ -1,6 +1,6 @@
 import type { Route } from "./+types/mfa";
 // @ts-ignore  
-import Navigation from "../../src/components/Navigation.tsx";
+import Navigation from "../../src/components/Navigation";
 // @ts-ignore
 import MFAPage from '../../src/pages/MFAPage';
 

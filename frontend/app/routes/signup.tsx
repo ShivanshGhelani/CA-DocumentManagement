@@ -1,6 +1,6 @@
 import type { Route } from "./+types/signup";
 // @ts-ignore  
-import Navigation from "../../src/components/Navigation.tsx";
+import Navigation from "../../src/components/Navigation";
 // @ts-ignore
 import SignupPage from '../../src/pages/SignupPage.jsx';
 

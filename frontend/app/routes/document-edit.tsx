@@ -1,6 +1,6 @@
 import type { Route } from "./+types/document-edit";
 // @ts-ignore  
-import Navigation from "../../src/components/Navigation.tsx";
+import Navigation from "../../src/components/Navigation";
 // @ts-ignore
 import DocumentEditPage from "../../src/pages/DocumentEditPage.jsx";
 

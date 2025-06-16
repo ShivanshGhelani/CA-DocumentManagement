@@ -1,6 +1,6 @@
 import type { Route } from "./+types/home";
 // @ts-ignore  
-import Navigation from "../../src/components/Navigation.tsx";
+import Navigation from "../../src/components/Navigation";
 import { useNavigate } from "react-router";
 
 export function meta({}: Route.MetaArgs) {

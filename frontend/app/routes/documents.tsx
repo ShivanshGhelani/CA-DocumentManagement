@@ -1,6 +1,6 @@
 import type { Route } from "./+types/documents";
 // @ts-ignore  
-import Navigation from "../../src/components/Navigation.tsx";
+import Navigation from "../../src/components/Navigation";
 // @ts-ignore
 import DocumentListPage from '../../src/pages/DocumentListPage.jsx';
 
