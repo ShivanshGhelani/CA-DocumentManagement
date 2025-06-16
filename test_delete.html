@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Delete API</title>
+</head>
+<body>
+    <h1>Test Delete API</h1>
+    <button onclick="testDelete()">Test Delete Document</button>
+    <div id="result"></div>
+
+    <script>
+        async function testDelete() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                // First, let's test if we can get documents
+                const listResponse = await fetch('http://localhost:8000/api/documents/', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include'
+                });
+                
+                resultDiv.innerHTML += `<p>List Documents: ${listResponse.status}</p>`;
+                
+                if (listResponse.ok) {
+                    const data = await listResponse.json();
+                    resultDiv.innerHTML += `<p>Found ${data.results?.length || 0} documents</p>`;
+                    
+                    if (data.results && data.results.length > 0) {
+                        const docId = data.results[0].id;
+                        resultDiv.innerHTML += `<p>Testing delete on document: ${docId}</p>`;
+                        
+                        // Try to delete the first document
+                        const deleteResponse = await fetch(`http://localhost:8000/api/documents/${docId}/`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            credentials: 'include'
+                        });
+                        
+                        resultDiv.innerHTML += `<p>Delete Response: ${deleteResponse.status}</p>`;
+                        
+                        if (!deleteResponse.ok) {
+                            const errorText = await deleteResponse.text();
+                            resultDiv.innerHTML += `<p>Delete Error: ${errorText}</p>`;
+                        } else {
+                            resultDiv.innerHTML += `<p>✅ Delete Successful!</p>`;
+                        }
+                    }
+                } else {
+                    const errorText = await listResponse.text();
+                    resultDiv.innerHTML += `<p>List Error: ${errorText}</p>`;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += `<p>JavaScript Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
