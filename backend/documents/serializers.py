@@ -4,12 +4,13 @@ from accounts.serializers import UserProfileSerializer
 
 
 class TagSerializer(serializers.ModelSerializer):
-    """Serializer for Tag model"""
+    """Serializer for Tag model with key-value support"""
     documents_count = serializers.SerializerMethodField()
+    display_name = serializers.ReadOnlyField()
     
     class Meta:
         model = Tag
-        fields = ('id', 'name', 'color', 'documents_count', 'created_at', 'created_by')
+        fields = ('id', 'key', 'value', 'display_name', 'color', 'documents_count', 'created_at', 'created_by')
         read_only_fields = ('id', 'created_at', 'created_by')
     
     def get_documents_count(self, obj):
@@ -18,6 +19,12 @@ class TagSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
+    
+    def validate(self, data):
+        """Validate that key is provided"""
+        if not data.get('key'):
+            raise serializers.ValidationError({'key': 'Key is required for tags.'})
+        return data
 
 
 class DocumentVersionSerializer(serializers.ModelSerializer):
@@ -60,7 +67,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = ('id', 'title', 'description', 'file_url', 'file_size', 
+        fields = ('id', 'title', 'description', 'content', 'file_url', 'file_size', 
                  'file_type', 'status', 'version', 'created_by', 'tags', 
                  'created_at', 'updated_at', 'can_edit')
     
@@ -106,7 +113,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = ('id', 'title', 'description', 'file', 'file_url', 'file_size', 
+        fields = ('id', 'title', 'description', 'content', 'file', 'file_url', 'file_size', 
                  'file_type', 'status', 'version', 'created_by', 'tags', 'tag_ids',
                  'versions', 'access_permissions', 'created_at', 'updated_at',
                  'can_edit', 'can_delete')
@@ -186,27 +193,40 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
 
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
-    """Serializer for Document creation"""
-    tag_ids = serializers.ListField(
-        child=serializers.IntegerField(),
+    """Serializer for Document creation with content and file support"""
+    
+    tags_data = serializers.JSONField(
         required=False,
-        allow_empty=True
+        allow_null=True,
+        help_text="List of tag objects with 'key' and optional 'value' fields"
     )
     
     class Meta:
         model = Document
-        fields = ('title', 'description', 'file', 'status', 'tag_ids')
-        extra_kwargs = {
-            'file': {'required': True}
-        }
+        fields = ('id', 'title', 'description', 'content', 'file', 'status', 'tags_data')
+        read_only_fields = ('id',)
+    
+    def validate(self, data):
+        """Validate that either content or file is provided"""
+        content = data.get('content', '').strip()
+        file = data.get('file')
+        
+        if not content and not file:
+            raise serializers.ValidationError("Either content or file must be provided.")
+        
+        return data
     
     def validate_file(self, value):
+        """File validation for size and type"""
+        if not value:
+            return value
+            
         # File size validation (10MB max)
         if value.size > 10 * 1024 * 1024:
             raise serializers.ValidationError('File size cannot exceed 10MB')
         
         # File type validation
-        allowed_extensions = ['pdf', 'doc', 'docx', 'txt']
+        allowed_extensions = ['pdf', 'docx', 'txt']
         file_extension = value.name.split('.')[-1].lower()
         if file_extension not in allowed_extensions:
             raise serializers.ValidationError(
@@ -215,13 +235,58 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         
         return value
     
+    def validate_tags_data(self, value):
+        """Validate tags data structure"""
+        if not value:
+            return value
+        
+        # Handle JSON string input (from multipart form data)
+        if isinstance(value, str):
+            try:
+                import json
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("Invalid JSON format for tags_data")
+        
+        if not isinstance(value, list):
+            raise serializers.ValidationError("tags_data must be a list of tag objects")
+            
+        for i, tag_data in enumerate(value):
+            if not isinstance(tag_data, dict):
+                raise serializers.ValidationError(f"Tag at index {i} must be an object with 'key' and optional 'value'")
+            
+            if 'key' not in tag_data or not tag_data['key'] or not tag_data['key'].strip():
+                raise serializers.ValidationError(f"Tag at index {i} must have a non-empty 'key' field")
+                
+            # Limit key and value lengths
+            if len(tag_data['key']) > 50:
+                raise serializers.ValidationError(f"Tag key at index {i} cannot exceed 50 characters")
+                
+            if 'value' in tag_data and tag_data['value'] and len(str(tag_data['value'])) > 100:
+                raise serializers.ValidationError(f"Tag value at index {i} cannot exceed 100 characters")
+        
+        return value
+    
     def create(self, validated_data):
-        tag_ids = validated_data.pop('tag_ids', [])
+        tags_data = validated_data.pop('tags_data', [])
         validated_data['created_by'] = self.context['request'].user
+        
+        # Create the document
         document = super().create(validated_data)
         
-        if tag_ids:
-            tags = Tag.objects.filter(id__in=tag_ids, created_by=self.context['request'].user)
-            document.tags.set(tags)
+        # Create and associate tags
+        if tags_data:
+            for tag_data in tags_data:
+                key = tag_data['key'].strip()
+                value = tag_data.get('value', '').strip() if tag_data.get('value') else ''
+                
+                # Get or create the tag for this user
+                tag, created = Tag.objects.get_or_create(
+                    key=key,
+                    value=value,
+                    created_by=self.context['request'].user,
+                    defaults={'color': '#007bff'}
+                )
+                document.tags.add(tag)
         
         return document

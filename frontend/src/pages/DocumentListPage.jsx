@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 // Debounce hook
 function useDebounce(value, delay) {
@@ -20,9 +21,9 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-export default function DocumentListPage() {
-  const navigate = useNavigate();
+export default function DocumentListPage() {  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   
   const [filters, setFilters] = useState({
     search: '',
@@ -46,23 +47,19 @@ export default function DocumentListPage() {
   useEffect(() => {
     setFilters(prev => ({ ...prev, search: debouncedSearch }));
   }, [debouncedSearch]);
-  const { data: documentsData, isLoading, error } = useQuery({
+
+  const { data: documentsData, isLoading: documentsLoading, error } = useQuery({
     queryKey: ['documents', filters],
     queryFn: () => documentsAPI.getDocuments(filters),
-    keepPreviousData: true,
-  });
+    keepPreviousData: true,  });
+
   // Fetch available tags for filter
   const { data: availableTags } = useQuery({
     queryKey: ['tags'],
-    queryFn: tagsAPI.getTags,
+    queryFn: tagsAPI.getAllTags,
   });
 
-  // Get unique creators for filter dropdown
-  const uniqueCreators = documentsData?.results ? 
-    [...new Set(documentsData.results.map(doc => doc.created_by?.email).filter(Boolean))] : [];
-
-  // Ensure availableTags is an array
-  const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);// Delete mutation
+  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: documentsAPI.deleteDocument,
     onSuccess: () => {
@@ -84,6 +81,36 @@ export default function DocumentListPage() {
       window.open(data.download_url, '_blank');
     },
   });
+
+  // Check authentication and redirect if necessary
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/signin');
+    }
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;  }
+
+  // Get unique creators for filter dropdown
+  const uniqueCreators = documentsData?.results ?    [...new Set(documentsData.results.map(doc => doc.created_by?.email).filter(Boolean))] : [];
+
+  // Ensure availableTags is an array
+  const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
+
   const handleDeleteClick = (document) => {
     setDocumentToDelete(document);
     setDeleteModalOpen(true);
@@ -231,13 +258,12 @@ export default function DocumentListPage() {
                       key={tag.id}
                       onClick={() => handleTagSelect(tag)}
                       disabled={selectedTags.find(t => t.id === tag.id)}
-                      className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                        selectedTags.find(t => t.id === tag.id)
+                      className={`px-3 py-1 rounded-full text-sm border transition-colors ${                        selectedTags.find(t => t.id === tag.id)
                           ? 'bg-blue-100 text-blue-800 border-blue-300 cursor-not-allowed'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
-                      {tag.name}
+                      {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
                     </button>
                   ))
                 ) : (
@@ -248,12 +274,11 @@ export default function DocumentListPage() {
               {/* Selected Tags */}
               {selectedTags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {selectedTags.map((tag) => (
-                    <span
+                  {selectedTags.map((tag) => (                    <span
                       key={tag.id}
                       className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
                     >
-                      {tag.name}
+                      {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
                       <button
                         onClick={() => handleTagRemove(tag.id)}
                         className="ml-2 text-blue-600 hover:text-blue-800"
@@ -281,7 +306,7 @@ export default function DocumentListPage() {
         </div>
 
         {/* Results */}
-        {isLoading ? (
+        {documentsLoading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
@@ -292,7 +317,8 @@ export default function DocumentListPage() {
         ) : (
           <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200">                
+                <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Document Title
@@ -319,23 +345,24 @@ export default function DocumentListPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {documentsData?.results?.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-gray-50">                      <td className="px-6 py-4 whitespace-nowrap">
+                    <tr key={doc.id} className="hover:bg-gray-50">                      
+                    <td className="px-6 py-4 whitespace-nowrap">
                         <button 
                           onClick={() => navigate(`/documents/${doc.id}`)}
                           className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
                         >
                           {doc.title}
                         </button>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </td>                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-wrap gap-1">
                           {doc.tags && doc.tags.length > 0 ? (
                             doc.tags.map((tag, idx) => (
                               <span 
                                 key={idx} 
                                 className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
                               >
-                                {tag.name}
+                                {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
                               </span>
                             ))
                           ) : (

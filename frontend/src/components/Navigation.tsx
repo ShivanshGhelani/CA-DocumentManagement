@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
+// @ts-ignore
+import { authAPI } from '../services/api';
 
 interface User {
   email: string;
   first_name?: string;
   last_name?: string;
+  avatar_url?: string;
 }
 
 export default function Navigation() {
@@ -14,14 +17,24 @@ export default function Navigation() {
   const [isClient, setIsClient] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
   useEffect(() => {
     setIsClient(true);
     const storedUser = localStorage.getItem('user');
     const token = localStorage.getItem('access_token');
     setUser(storedUser ? JSON.parse(storedUser) : null);
     setIsAuthenticated(!!token);
-  }, []);
+      // Fetch current profile data to get updated avatar
+    if (token && isClient) {
+      authAPI.getProfile()
+        .then((profileData: User) => {
+          setUser(profileData);
+          localStorage.setItem('user', JSON.stringify(profileData));
+        })
+        .catch((error: any) => {
+          console.error('Error fetching profile:', error);
+        });
+    }
+  }, [isClient]);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -81,24 +94,32 @@ export default function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            <div className="flex items-center space-x-4">
-              {isAuthenticated ? (
+            <div className="flex items-center space-x-4">              {isAuthenticated ? (
                 <>
                   <NavLink to="/documents">My Documents</NavLink>
                   <NavLink to="/documents/create">Upload Document</NavLink>
-                    {/* User Menu */}
-                  <div className="flex items-center space-x-4 ml-6 pl-6 border-l border-blue-500">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                    {/* User Menu */}                  <div className="flex items-center space-x-4 ml-6 pl-6 border-l border-blue-500">                    <button 
+                      onClick={() => navigate('/profile')}
+                      className="flex items-center space-x-2 hover:bg-blue-700 rounded-md px-2 py-1 transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center overflow-hidden">
+                        {user?.avatar_url ? (
+                          <img 
+                            src={user.avatar_url} 
+                            alt="Avatar" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
                       </div>
-                      <div className="text-blue-100 text-sm">
+                      <div className="text-blue-100 text-sm text-left">
                         <div className="font-medium">{user?.first_name || 'User'}</div>
                         <div className="text-xs text-blue-200">{user?.email}</div>
                       </div>
-                    </div>
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="inline-flex items-center bg-blue-700 hover:bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -146,23 +167,34 @@ export default function Navigation() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 border-t border-blue-500">
-              {isAuthenticated ? (
+            <div className="px-2 pt-2 pb-3 space-y-1 border-t border-blue-500">              {isAuthenticated ? (
                 <>
                   <NavLink to="/documents" className="block">My Documents</NavLink>
-                  <NavLink to="/documents/create" className="block">Upload Document</NavLink>
-                    <div className="pt-4 mt-4 border-t border-blue-500">
-                    <div className="flex items-center space-x-3 px-3 py-2">
-                      <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                  <NavLink to="/documents/create" className="block">Upload Document</NavLink>                    <div className="pt-4 mt-4 border-t border-blue-500">
+                    <button 
+                      onClick={() => {
+                        navigate('/profile');
+                        setMobileMenuOpen(false);
+                      }}                      className="flex items-center space-x-3 px-3 py-2 hover:bg-blue-700 rounded-md transition-colors w-full text-left"
+                    >
+                      <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center overflow-hidden">
+                        {user?.avatar_url ? (
+                          <img 
+                            src={user.avatar_url} 
+                            alt="Avatar" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
                       </div>
-                      <div className="text-blue-100 text-sm">
+                      <div className="text-blue-100 text-sm text-left">
                         <div className="font-medium">{user?.first_name || 'User'}</div>
                         <div className="text-xs text-blue-200">{user?.email}</div>
                       </div>
-                    </div>
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full text-left bg-blue-700 hover:bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors mt-2"

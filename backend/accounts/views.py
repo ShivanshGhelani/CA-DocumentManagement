@@ -6,7 +6,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, MFASetupSerializer,
-    MFAVerifySerializer, UserProfileSerializer, PasswordChangeSerializer
+    MFAVerifySerializer, UserProfileSerializer, PasswordChangeSerializer,
+    UserDetailSerializer
 )
 from audit.models import AuditLog
 
@@ -55,14 +56,18 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         serializer.is_valid(raise_exception=True)
         
         user = serializer.validated_data['user']
-        
-        # Check if MFA is enabled
+          # Check if MFA is enabled
         if user.is_mfa_enabled:
-            # Return temporary token for MFA verification
+            # Generate and send MFA code
+            mfa_code = user.generate_mfa_code()
+            
+            # In a real application, you would send this via SMS/email
+            # For now, we'll return it in the response (remove this in production)
             return Response({
                 'requires_mfa': True,
                 'user_id': user.id,
-                'message': 'MFA verification required'
+                'message': 'MFA verification required',
+                'mfa_code': mfa_code  # Remove this line in production!
             })
         
         # Log successful login
@@ -112,9 +117,9 @@ def mfa_verify(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    if not user.verify_totp(token):
+    if not user.verify_mfa_code(token):
         return Response(
-            {'error': 'Invalid MFA token'}, 
+            {'error': 'Invalid or expired MFA code'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -154,19 +159,8 @@ class MFASetupView(generics.RetrieveAPIView):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def mfa_enable(request):
-    """Enable MFA for user"""
-    serializer = MFAVerifySerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    
-    token = serializer.validated_data['token']
+    """Enable MFA for user (no verification needed for enabling)"""
     user = request.user
-    
-    if not user.verify_totp(token):
-        return Response(
-            {'error': 'Invalid MFA token'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
     user.is_mfa_enabled = True
     user.save()
     
@@ -182,7 +176,7 @@ def mfa_enable(request):
     )
     
     return Response({
-        'message': 'MFA enabled successfully',
+        'message': 'MFA enabled successfully. You will receive a 6-digit code on your next login.',
         'user': UserProfileSerializer(user).data
     })
 
@@ -213,7 +207,7 @@ def mfa_disable(request):
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
-    """User profile view"""
+    """Get and update user profile"""
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
     
@@ -221,47 +215,124 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
     
     def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Prevent editing hear_about if it already has a value
+        if instance.hear_about and 'hear_about' in request.data:
+            request.data.pop('hear_about')
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
         
         # Log profile update
         AuditLog.log_activity(
             user=request.user,
             action='update',
-            resource_type='user',
+            resource_type='user_profile',
             resource_id=request.user.id,
             resource_name=request.user.email,
-            details={'fields_updated': list(request.data.keys())},
+            details={'updated_fields': list(request.data.keys())},
             request=request
         )
         
-        return response
+        return Response(serializer.data)
 
 
 class PasswordChangeView(generics.GenericAPIView):
-    """Password change view"""
+    """Change user password"""
     serializer_class = PasswordChangeSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-        
-        user = request.user
-        user.set_password(serializer.validated_data['new_password'])
-        user.save()
+        serializer.save()
         
         # Log password change
         AuditLog.log_activity(
-            user=user,
-            action='update',
+            user=request.user,
+            action='password_change',
             resource_type='user',
-            resource_id=user.id,
-            resource_name=user.email,
-            details={'password_changed': True},
+            resource_id=request.user.id,
+            resource_name=request.user.email,
             request=request
         )
         
-        return Response({'message': 'Password changed successfully'})
+        return Response({
+            'message': 'Password changed successfully'
+        }, status=status.HTTP_200_OK)
+
+
+class AvatarUploadView(generics.UpdateAPIView):
+    """Upload user avatar"""
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_object(self):
+        return self.request.user
+    
+    def patch(self, request, *args, **kwargs):
+        if 'avatar' not in request.data:
+            return Response(
+                {'error': 'No avatar file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        instance = self.get_object()
+        
+        # Delete old avatar if it exists
+        if instance.avatar:
+            instance.avatar.delete()
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # Log avatar upload
+        AuditLog.log_activity(
+            user=request.user,
+            action='avatar_upload',
+            resource_type='user',
+            resource_id=request.user.id,
+            resource_name=request.user.email,
+            request=request
+        )
+        
+        return Response({
+            'message': 'Avatar uploaded successfully',
+            'avatar_url': serializer.data.get('avatar_url')
+        })
+
+
+class AvatarDeleteView(generics.GenericAPIView):
+    """Delete user avatar"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def delete(self, request):
+        user = request.user
+        
+        if user.avatar:
+            user.avatar.delete()
+            user.save()
+            
+            # Log avatar deletion
+            AuditLog.log_activity(
+                user=request.user,
+                action='avatar_delete',
+                resource_type='user',
+                resource_id=request.user.id,
+                resource_name=request.user.email,
+                request=request
+            )
+            
+            return Response({'message': 'Avatar deleted successfully'})
+        else:
+            return Response(
+                {'error': 'No avatar to delete'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 @api_view(['POST'])

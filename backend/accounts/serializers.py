@@ -93,30 +93,97 @@ class MFAVerifySerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Serializer for user profile"""
+    """Serializer for user profile information"""
+    avatar_url = serializers.SerializerMethodField()
+    email = serializers.EmailField(read_only=True)  # Non-editable
+    hear_about = serializers.CharField(read_only=True)  # Non-editable if not empty
+    
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 
-                 'is_mfa_enabled', 'phone_number', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'email', 'created_at', 'updated_at')
+        fields = (
+            'username', 'first_name', 'last_name', 'email', 'job_title', 
+            'purpose', 'hear_about', 'avatar', 'avatar_url', 'phone_number'
+        )
+    
+    def get_avatar_url(self, obj):
+        """Get avatar URL"""
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+        return None
+    
+    def validate_avatar(self, value):
+        """Validate avatar file"""
+        if value:
+            # Check file size (5MB limit)
+            if value.size > 5 * 1024 * 1024:
+                raise serializers.ValidationError("Avatar file size cannot exceed 5MB.")
+            
+            # Check file type
+            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+            if value.content_type not in allowed_types:
+                raise serializers.ValidationError("Avatar must be a JPEG, PNG, or GIF image.")
+        
+        return value
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-    """Serializer for password change"""
-    old_password = serializers.CharField(style={'input_type': 'password'})
+    """Serializer for changing password"""
+    old_password = serializers.CharField(
+        style={'input_type': 'password'},
+        write_only=True
+    )
     new_password = serializers.CharField(
         validators=[validate_password],
-        style={'input_type': 'password'}
+        style={'input_type': 'password'},
+        write_only=True
     )
-    new_password_confirm = serializers.CharField(style={'input_type': 'password'})
-    
-    def validate(self, attrs):
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError("New passwords don't match")
-        return attrs
+    confirm_password = serializers.CharField(
+        style={'input_type': 'password'},
+        write_only=True
+    )
     
     def validate_old_password(self, value):
+        """Validate old password"""
         user = self.context['request'].user
         if not user.check_password(value):
-            raise serializers.ValidationError('Incorrect old password')
+            raise serializers.ValidationError("Old password is incorrect.")
         return value
+    
+    def validate(self, attrs):
+        """Validate password confirmation"""
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({
+                'confirm_password': "New passwords don't match."
+            })
+        return attrs
+    
+    def save(self):
+        """Change the user's password"""
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        return user
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    """Detailed user serializer for API responses"""
+    avatar_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = (
+            'id', 'username', 'email', 'first_name', 'last_name', 
+            'job_title', 'purpose', 'hear_about', 'avatar_url', 
+            'phone_number', 'is_mfa_enabled', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'email', 'created_at', 'updated_at')
+    
+    def get_avatar_url(self, obj):
+        """Get avatar URL"""
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+        return None

@@ -141,13 +141,10 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        # Get documents created by user or shared with user
-        owned_docs = Document.objects.filter(created_by=user)
-        shared_docs = Document.objects.filter(
-            access_permissions__user=user
+        # Get documents created by user or shared with user using Q objects
+        return Document.objects.filter(
+            Q(created_by=user) | Q(access_permissions__user=user)
         ).distinct()
-        
-        return (owned_docs | shared_docs).distinct()
     
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -438,3 +435,44 @@ def deleted_documents(request):
         })
     
     return Response(documents_data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def tag_suggestions(request):
+    """Get tag suggestions for auto-complete"""
+    query = request.query_params.get('q', '').strip()
+    user = request.user
+    
+    # Get unique keys for the user
+    keys_queryset = Tag.objects.filter(created_by=user)
+    
+    if query:
+        # Filter by key or value containing the query
+        keys_queryset = keys_queryset.filter(
+            Q(key__icontains=query) | Q(value__icontains=query)
+        )
+    
+    # Get unique keys
+    unique_keys = set(keys_queryset.values_list('key', flat=True))
+    
+    # For each key, get all unique values
+    suggestions = []
+    for key in unique_keys:
+        values = Tag.objects.filter(
+            created_by=user,
+            key=key
+        ).values_list('value', flat=True).distinct()
+        
+        # Add the key without value
+        suggestions.append({'key': key, 'value': ''})
+        
+        # Add key-value combinations
+        for value in values:
+            if value:  # Only add non-empty values
+                suggestions.append({'key': key, 'value': value})
+    
+    # Sort suggestions
+    suggestions.sort(key=lambda x: (x['key'], x['value']))
+    
+    return Response(suggestions[:20])  # Limit to 20 suggestions

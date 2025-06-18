@@ -38,6 +38,25 @@ export const authAPI = {
     return response.data;
   },
 
+  // Upload avatar
+  uploadAvatar: async (avatarFile) => {
+    const formData = new FormData();
+    formData.append('avatar', avatarFile);
+    
+    const response = await apiClient.patch('/auth/avatar/upload/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Delete avatar
+  deleteAvatar: async () => {
+    const response = await apiClient.delete('/auth/avatar/delete/');
+    return response.data;
+  },
+
   // MFA setup
   setupMFA: async () => {
     const response = await apiClient.get('/auth/mfa/setup/');
@@ -76,18 +95,19 @@ export const documentsAPI = {
     const response = await apiClient.get(`/documents/${id}/`);
     return response.data;
   },
-
   // Create document
   createDocument: async (documentData) => {
     const formData = new FormData();
     
     // Append all fields to FormData
     Object.keys(documentData).forEach(key => {
-      if (key === 'tag_ids' && Array.isArray(documentData[key])) {
+      if (key === 'tags_data' && Array.isArray(documentData[key])) {
+        formData.append('tags_data', JSON.stringify(documentData[key]));
+      } else if (key === 'tag_ids' && Array.isArray(documentData[key])) {
         documentData[key].forEach(tagId => {
           formData.append('tag_ids', tagId);
         });
-      } else {
+      } else if (documentData[key] !== null && documentData[key] !== undefined && documentData[key] !== '') {
         formData.append(key, documentData[key]);
       }
     });
@@ -165,6 +185,14 @@ export const tagsAPI = {
   // Get all tags
   getTags: async () => {
     const response = await apiClient.get('/tags/');
+    return response.data;
+  },
+
+  // Get tag suggestions for auto-complete
+  getTagSuggestions: async (query = '') => {
+    const response = await apiClient.get('/tags/suggestions/', {
+      params: { q: query }
+    });
     return response.data;
   },
 

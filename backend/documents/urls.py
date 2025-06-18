@@ -1,11 +1,12 @@
 from django.urls import path
 from . import views
 
-urlpatterns = [
-    # Tags
+urlpatterns = [    # Tags
     path('tags/', views.TagListCreateView.as_view(), name='tag-list-create'),
     path('tags/<int:pk>/', views.TagDetailView.as_view(), name='tag-detail'),
-      # Documents
+    path('tags/suggestions/', views.tag_suggestions, name='tag-suggestions'),
+    
+    # Documents
     path('documents/', views.DocumentListView.as_view(), name='document-list'),
     path('documents/create/', views.DocumentCreateView.as_view(), name='document-create'),
     path('documents/deleted/', views.deleted_documents, name='deleted-documents'),

@@ -5,10 +5,14 @@ from .models import Document, DocumentVersion, Tag, DocumentAccess
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     """Admin configuration for Tag model"""
-    list_display = ('name', 'color', 'created_by', 'created_at')
-    list_filter = ('created_at', 'created_by')
-    search_fields = ('name',)
-    readonly_fields = ('created_at',)
+    list_display = ('key', 'value', 'display_name', 'color', 'created_by', 'created_at')
+    list_filter = ('created_at', 'created_by', 'key')
+    search_fields = ('key', 'value')
+    readonly_fields = ('created_at', 'display_name')
+    
+    def display_name(self, obj):
+        return obj.display_name
+    display_name.short_description = 'Display Name'
 
 
 @admin.register(Document)

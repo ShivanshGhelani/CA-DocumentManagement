@@ -14,8 +14,9 @@ urlpatterns = [
     path('mfa/verify/', views.mfa_verify, name='mfa-verify'),
     path('mfa/enable/', views.mfa_enable, name='mfa-enable'),
     path('mfa/disable/', views.mfa_disable, name='mfa-disable'),
-    
-    # Profile
+      # Profile
     path('profile/', views.UserProfileView.as_view(), name='user-profile'),
     path('password/change/', views.PasswordChangeView.as_view(), name='password-change'),
+    path('avatar/upload/', views.AvatarUploadView.as_view(), name='avatar-upload'),
+    path('avatar/delete/', views.AvatarDeleteView.as_view(), name='avatar-delete'),
 ]

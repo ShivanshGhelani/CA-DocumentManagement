@@ -4,7 +4,7 @@ import * as Yup from 'yup';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import { useNavigate } from 'react-router';
-import { useAuth } from '../hooks/useAuth.jsx';
+import Navigation from '../components/Navigation';
 
 const DocumentCreateSchema = Yup.object().shape({
   title: Yup.string()
@@ -30,13 +30,12 @@ const DocumentCreateSchema = Yup.object().shape({
 
 export default function DocumentCreatePage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading } = useAuth();
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState({ key: '', value: '' });
   const [tagSuggestions, setTagSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const tagInputRef = useRef(null);
-
+  
   // Fetch tag suggestions with debouncing
   const { refetch: fetchSuggestions } = useQuery({
     queryKey: ['tagSuggestions', tagInput.key],
@@ -58,30 +57,8 @@ export default function DocumentCreatePage() {
     }
   });
 
-  // Check authentication and redirect if necessary
-  React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/signin');
-    }
-  }, [isLoading, isAuthenticated, navigate]);
-
-  // Show loading while checking authentication
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-  // Don't render anything if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const handleTagInputChange = (field, value) => {    setTagInput(prev => ({ ...prev, [field]: value }));
+  const handleTagInputChange = (field, value) => {
+    setTagInput(prev => ({ ...prev, [field]: value }));
     
     // Fetch suggestions when typing in key field
     if (field === 'key' && value.trim()) {
@@ -125,8 +102,11 @@ export default function DocumentCreatePage() {
       addTag();
     }
   };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm border p-6">

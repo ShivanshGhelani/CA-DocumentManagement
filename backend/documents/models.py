@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import FileExtensionValidator
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 import uuid
 import os
@@ -32,17 +33,28 @@ class DocumentManager(models.Manager):
 
 
 class Tag(models.Model):
-    """Tag model for document categorization"""
-    name = models.CharField(max_length=50, unique=True)
+    """Tag model for document categorization with key-value support"""
+    key = models.CharField(max_length=50, help_text="Tag key/name (required)")
+    value = models.CharField(max_length=100, blank=True, help_text="Tag value (optional)")
     color = models.CharField(max_length=7, default='#007bff')  # Hex color
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tags')
     
     class Meta:
-        ordering = ['name']
+        ordering = ['key', 'value']
+        unique_together = ['key', 'value', 'created_by']  # Same user can't have duplicate key-value pairs
     
     def __str__(self):
-        return self.name
+        if self.value:
+            return f"{self.key}: {self.value}"
+        return self.key
+    
+    @property
+    def display_name(self):
+        """Display name for the tag"""
+        if self.value:
+            return f"{self.key}: {self.value}"
+        return self.key
 
 
 class Document(models.Model):
@@ -54,14 +66,16 @@ class Document(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=100)  # Updated max length to 100
     description = models.TextField(blank=True)
+    content = models.TextField(blank=True, help_text="Document content (optional if file is provided)")
     file = models.FileField(
         upload_to=document_upload_path,
-        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'txt'])]
+        blank=True,  # Made optional since content can be provided instead
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'docx', 'txt'])]
     )
-    file_size = models.PositiveIntegerField()  # in bytes
-    file_type = models.CharField(max_length=10)
+    file_size = models.PositiveIntegerField(null=True, blank=True)  # in bytes, optional now
+    file_type = models.CharField(max_length=10, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
     version = models.PositiveIntegerField(default=1)
     
@@ -83,8 +97,7 @@ class Document(models.Model):
         blank=True, 
         related_name='deleted_documents'
     )
-    
-    # Custom manager
+      # Custom manager
     objects = DocumentManager()
     
     class Meta:
@@ -110,6 +123,15 @@ class Document(models.Model):
             self.file_size = self.file.size
             self.file_type = self.file.name.split('.')[-1].lower()
         super().save(*args, **kwargs)
+    
+    def clean(self):
+        """Model-level validation to ensure either content or file is provided"""
+        if not self.content and not self.file:
+            raise ValidationError("Either content or file must be provided.")
+        
+        # Validate file size if file is provided
+        if self.file and self.file.size > 10 * 1024 * 1024:  # 10MB limit
+            raise ValidationError("File size cannot exceed 10MB.")
 
     def __str__(self):
         return f"{self.title} (v{self.version})"
