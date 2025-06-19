@@ -96,14 +96,21 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for user profile information"""
     avatar_url = serializers.SerializerMethodField()
     email = serializers.EmailField(read_only=True)  # Non-editable
-    hear_about = serializers.CharField(read_only=True)  # Non-editable if not empty
+    username = serializers.CharField(read_only=True)  # Non-editable
     
     class Meta:
         model = User
         fields = (
             'username', 'first_name', 'last_name', 'email', 'job_title', 
-            'purpose', 'hear_about', 'avatar', 'avatar_url', 'phone_number'
+            'purpose', 'hear_about', 'avatar', 'avatar_url', 'phone_number',
+            'is_mfa_enabled', 'date_joined'
         )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make hear_about read-only if it already has a value
+        if self.instance and self.instance.hear_about:
+            self.fields['hear_about'].read_only = True
     
     def get_avatar_url(self, obj):
         """Get avatar URL"""

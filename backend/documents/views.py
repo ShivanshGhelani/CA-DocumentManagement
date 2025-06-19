@@ -15,10 +15,17 @@ from audit.models import AuditLog
 class TagListCreateView(generics.ListCreateAPIView):
     """List and create tags"""
     serializer_class = TagSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
+    permission_classes = [permissions.IsAuthenticated]    
     def get_queryset(self):
-        return Tag.objects.filter(created_by=self.request.user)
+        # Only return tags that are either:
+        # 1. Associated with non-deleted documents, OR
+        # 2. Not associated with any documents yet (for new tag creation)
+        return Tag.objects.filter(
+            created_by=self.request.user
+        ).filter(
+            Q(documents__isnull=True) | 
+            Q(documents__is_deleted=False)
+        ).distinct()
     
     def perform_create(self, serializer):
         tag = serializer.save()
@@ -87,12 +94,13 @@ class DocumentListView(generics.ListAPIView):
         # Get documents created by user or shared with user using Q objects
         queryset = Document.objects.filter(
             Q(created_by=user) | Q(access_permissions__user=user)
-        ).distinct()
-        
-        # Additional filtering
-        tag_names = self.request.query_params.getlist('tag_name')
-        if tag_names:
-            queryset = queryset.filter(tags__name__in=tag_names).distinct()
+        ).distinct()        # Handle tags filtering explicitly
+        tag_ids = self.request.query_params.getlist('tags[]')  # Frontend sends as tags[]
+        if not tag_ids:
+            tag_ids = self.request.query_params.getlist('tags')  # Fallback to tags
+        if tag_ids:
+            # Filter to include documents that have ANY of the selected tags
+            queryset = queryset.filter(tags__id__in=tag_ids).distinct()
         
         return queryset
     
@@ -421,17 +429,29 @@ def restore_document(request, pk):
 @permission_classes([permissions.IsAuthenticated])
 def deleted_documents(request):
     """List soft-deleted documents for the current user"""
+    from django.utils import timezone
+    from datetime import timedelta
+    
     user = request.user
     deleted_docs = Document.objects.deleted_only().filter(created_by=user)
     
+    # Grace period in days (configurable)
+    GRACE_PERIOD_DAYS = 30
+    
     documents_data = []
     for doc in deleted_docs:
+        # Calculate days remaining before permanent deletion
+        days_since_deletion = (timezone.now() - doc.deleted_at).days
+        days_remaining = max(0, GRACE_PERIOD_DAYS - days_since_deletion)
+        
         documents_data.append({
             'id': str(doc.id),
             'title': doc.title,
             'description': doc.description,
             'deleted_at': doc.deleted_at,
             'deleted_by': doc.deleted_by.email if doc.deleted_by else None,
+            'days_remaining': days_remaining,
+            'expires_soon': days_remaining <= 7,  # Warn when 7 days or less
         })
     
     return Response(documents_data)
@@ -443,9 +463,13 @@ def tag_suggestions(request):
     """Get tag suggestions for auto-complete"""
     query = request.query_params.get('q', '').strip()
     user = request.user
-    
-    # Get unique keys for the user
-    keys_queryset = Tag.objects.filter(created_by=user)
+      # Get unique keys for the user (only from non-deleted documents)
+    keys_queryset = Tag.objects.filter(
+        created_by=user
+    ).filter(
+        Q(documents__isnull=True) | 
+        Q(documents__is_deleted=False)
+    ).distinct()
     
     if query:
         # Filter by key or value containing the query
@@ -455,13 +479,15 @@ def tag_suggestions(request):
     
     # Get unique keys
     unique_keys = set(keys_queryset.values_list('key', flat=True))
-    
-    # For each key, get all unique values
+      # For each key, get all unique values (only from non-deleted documents)
     suggestions = []
     for key in unique_keys:
         values = Tag.objects.filter(
             created_by=user,
             key=key
+        ).filter(
+            Q(documents__isnull=True) | 
+            Q(documents__is_deleted=False)
         ).values_list('value', flat=True).distinct()
         
         # Add the key without value

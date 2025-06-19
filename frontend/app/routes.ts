@@ -9,5 +9,6 @@ export default [
   route("documents/create", "routes/document-create.tsx"), // Added document create route
   route("documents/:id/edit", "routes/document-edit.tsx"), // Added document edit route
   route("documents/:id", "routes/document-detail.tsx"), // Added document detail route
+  route("trash", "routes/trash.tsx"), // Added trash route
   route("profile", "routes/profile.tsx"), // Added profile route
 ] satisfies RouteConfig;

@@ -68,16 +68,31 @@ export const authAPI = {
     const response = await apiClient.post('/auth/mfa/verify/', { token, user_id: userId });
     return response.data;
   },
-
   // Enable MFA
-  enableMFA: async (token) => {
-    const response = await apiClient.post('/auth/mfa/enable/', { token });
+  enableMFA: async () => {
+    const response = await apiClient.post('/auth/mfa/enable/');
     return response.data;
   },
-
   // Disable MFA
   disableMFA: async () => {
     const response = await apiClient.post('/auth/mfa/disable/');
+    return response.data;
+  },
+  // Generate MFA code
+  generateMFACode: async () => {
+    const response = await apiClient.post('/auth/mfa/generate-code/');
+    return response.data;
+  },
+
+  // Generate backup codes
+  generateBackupCodes: async () => {
+    const response = await apiClient.post('/auth/mfa/backup-codes/generate/');
+    return response.data;
+  },
+
+  // Get backup codes status
+  getBackupCodesStatus: async () => {
+    const response = await apiClient.get('/auth/mfa/backup-codes/status/');
     return response.data;
   },
 };

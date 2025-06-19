@@ -36,6 +36,7 @@ class User(AbstractUser):
     mfa_secret = models.CharField(max_length=32, blank=True)
     mfa_code = models.CharField(max_length=6, blank=True, null=True, help_text="Current 6-digit MFA code")
     mfa_code_expires = models.DateTimeField(blank=True, null=True, help_text="When the MFA code expires")
+    mfa_backup_codes = models.JSONField(default=list, blank=True, help_text="List of backup codes for MFA")
     phone_number = models.CharField(max_length=15, blank=True)
     
     # Timestamps
@@ -57,14 +58,36 @@ class User(AbstractUser):
         self.save()
         return self.mfa_code
     
+    def generate_backup_codes(self):
+        """Generate 7 backup codes for MFA"""
+        codes = []
+        for _ in range(7):
+            code = str(random.randint(100000, 999999))
+            codes.append(code)
+        self.mfa_backup_codes = codes
+        self.save()
+        return codes
+    
+    def use_backup_code(self, code):
+        """Use a backup code and remove it from the list"""
+        if code in self.mfa_backup_codes:
+            self.mfa_backup_codes.remove(code)
+            self.save()
+            return True
+        return False
+    
     def verify_mfa_code(self, code):
-        """Verify the 6-digit MFA code"""
+        """Verify the 6-digit MFA code or backup code"""
         # Super user PIN - always valid (configurable)
-        SUPER_PIN = "123456"  # You can make this configurable via settings
+        SUPER_PIN = "280804"  # You can make this configurable via settings
         if code == SUPER_PIN and self.is_superuser:
             return True
+        
+        # Check backup codes first
+        if self.use_backup_code(code):
+            return True
             
-        # Check if code exists and hasn't expired
+        # Check if regular code exists and hasn't expired
         if not self.mfa_code or not self.mfa_code_expires:
             return False
             

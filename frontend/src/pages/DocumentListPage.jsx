@@ -51,12 +51,10 @@ export default function DocumentListPage() {  const navigate = useNavigate();
   const { data: documentsData, isLoading: documentsLoading, error } = useQuery({
     queryKey: ['documents', filters],
     queryFn: () => documentsAPI.getDocuments(filters),
-    keepPreviousData: true,  });
-
-  // Fetch available tags for filter
+    keepPreviousData: true,  });  // Fetch available tags for filter
   const { data: availableTags } = useQuery({
     queryKey: ['tags'],
-    queryFn: tagsAPI.getAllTags,
+    queryFn: tagsAPI.getTags,
   });
 
   // Delete mutation
@@ -70,17 +68,7 @@ export default function DocumentListPage() {  const navigate = useNavigate();
     onError: (error) => {
       console.error('Delete error:', error);
       alert('Failed to delete document. Please try again.');
-    },
-  });
-
-  // Download mutation
-  const downloadMutation = useMutation({
-    mutationFn: documentsAPI.downloadDocument,
-    onSuccess: (data) => {
-      // Open download URL in new tab
-      window.open(data.download_url, '_blank');
-    },
-  });
+    },  });
 
   // Check authentication and redirect if necessary
   useEffect(() => {
@@ -103,10 +91,19 @@ export default function DocumentListPage() {  const navigate = useNavigate();
 
   // Don't render anything if not authenticated (will redirect)
   if (!isAuthenticated) {
-    return null;  }
-
-  // Get unique creators for filter dropdown
-  const uniqueCreators = documentsData?.results ?    [...new Set(documentsData.results.map(doc => doc.created_by?.email).filter(Boolean))] : [];
+    return null;  }  // Get unique creators for filter dropdown
+  const uniqueCreators = documentsData?.results ? 
+    [...new Map(documentsData.results.map(doc => {
+      if (!doc.created_by) return null;
+      const user = doc.created_by;
+      const displayName = user.first_name && user.last_name 
+        ? `${user.first_name} ${user.last_name}` 
+        : user.email;
+      return [user.email, {
+        email: user.email,
+        displayName: displayName
+      }];
+    }).filter(Boolean)).values()] : [];
 
   // Ensure availableTags is an array
   const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
@@ -119,11 +116,7 @@ export default function DocumentListPage() {  const navigate = useNavigate();
   const confirmDelete = () => {
     if (documentToDelete) {
       deleteMutation.mutate(documentToDelete.id);
-    }
-  };
-  const handleDownload = (documentId) => {
-    downloadMutation.mutate(documentId);
-  };
+    }  };
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -197,16 +190,15 @@ export default function DocumentListPage() {  const navigate = useNavigate();
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Created By Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>                <select
                   value={filters.created_by}
                   onChange={(e) => handleFilterChange('created_by', e.target.value)}
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Users</option>
                   {uniqueCreators.map((creator) => (
-                    <option key={creator} value={creator}>
-                      {creator}
+                    <option key={creator.email} value={creator.email}>
+                      {creator.displayName}
                     </option>
                   ))}
                 </select>
@@ -313,50 +305,63 @@ export default function DocumentListPage() {  const navigate = useNavigate();
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
             Failed to load documents. Please try again.
-          </div>
-        ) : (
+          </div>        ) : (
           <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">                
+              <table className="min-w-full divide-y divide-gray-200">                  
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Document Title
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5 min-w-0">
+                      Document
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                       Tags
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                       Owner
+                    </th>                    
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                      Created
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created At
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                       Version
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {documentsData?.results?.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-gray-50">                      
-                    <td className="px-6 py-4 whitespace-nowrap">
-                        <button 
-                          onClick={() => navigate(`/documents/${doc.id}`)}
-                          className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
-                        >
-                          {doc.title}
-                        </button>
-                      </td>                      <td className="px-6 py-4 whitespace-nowrap">
+                    <tr key={doc.id} className="hover:bg-gray-50">                      {/* Document Title - Combined with description and mobile info */}
+                      <td className="px-4 py-4 min-w-0">
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => navigate(`/documents/${doc.id}`)}
+                            className="text-blue-600 hover:text-blue-800 font-medium focus:outline-none text-left truncate"
+                            title={doc.title}
+                          >
+                            {doc.title}
+                          </button>
+                          {doc.description && (
+                            <p className="text-sm text-gray-500 mt-1 truncate" title={doc.description}>
+                              {doc.description.length > 60 ? `${doc.description.substring(0, 60)}...` : doc.description}
+                            </p>
+                          )}
+                          <div className="flex items-center space-x-2 mt-1 md:hidden">
+                            <span className="text-xs text-gray-400">v{doc.version || '1.0'}</span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-400">{new Date(doc.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </td>                      {/* Tags - Hidden on mobile, limited to 2 tags */}
+                      <td className="px-3 py-4 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1">
                           {doc.tags && doc.tags.length > 0 ? (
-                            doc.tags.map((tag, idx) => (
+                            doc.tags.slice(0, 2).map((tag, idx) => (
                               <span 
                                 key={idx} 
                                 className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
@@ -366,22 +371,29 @@ export default function DocumentListPage() {  const navigate = useNavigate();
                               </span>
                             ))
                           ) : (
-                            <span className="text-gray-400 text-sm">No tags</span>
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                          {doc.tags && doc.tags.length > 2 && (
+                            <span className="text-xs text-gray-500">+{doc.tags.length - 2}</span>
                           )}
                         </div>
+                      </td>                      {/* Owner - Hidden on tablet and mobile, shows full name or email */}
+                      <td className="px-3 py-4 hidden lg:table-cell text-sm text-gray-900 truncate">
+                        {doc.created_by?.first_name && doc.created_by?.last_name 
+                          ? `${doc.created_by.first_name} ${doc.created_by.last_name}`
+                          : doc.created_by?.email?.split('@')[0] || 'Unknown'}
+                      </td>                      {/* Created At - Hidden on mobile */}
+                      <td className="px-3 py-4 hidden sm:table-cell text-sm text-gray-900">
+                        <span>{new Date(doc.created_at).toLocaleDateString()}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {doc.created_by?.email || 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(doc.created_at).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+
+                      {/* Version - Hidden on mobile and small tablets */}
+                      <td className="px-3 py-4 hidden md:table-cell text-sm text-gray-900">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           v{doc.version || '1.0'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </td>{/* Status */}
+                      <td className="px-3 py-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             doc.status === 'published' 
@@ -391,9 +403,10 @@ export default function DocumentListPage() {  const navigate = useNavigate();
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {doc.status}                        </span>
+                          {doc.status}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-1">
                           {/* View Button */}
                           <button
@@ -417,19 +430,7 @@ export default function DocumentListPage() {  const navigate = useNavigate();
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             Edit
-                          </button>
-                          {/* Download Button */}
-                          <button
-                            onClick={() => handleDownload(doc.id)}
-                            disabled={downloadMutation.isPending}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
-                            title="Download document"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            {downloadMutation.isPending ? 'Downloading...' : 'Download'}
-                          </button>
+                          </button>                          {/* Download Button - REMOVED */}
                           {/* Delete Button */}
                           <button
                             onClick={() => handleDeleteClick(doc)}

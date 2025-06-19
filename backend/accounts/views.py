@@ -187,6 +187,8 @@ def mfa_disable(request):
     """Disable MFA for user"""
     user = request.user
     user.is_mfa_enabled = False
+    user.mfa_code = None  # Clear any existing codes
+    user.mfa_code_expires = None
     user.save()
     
     # Log MFA disablement
@@ -206,6 +208,90 @@ def mfa_disable(request):
     })
 
 
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def mfa_generate_code(request):
+    """Generate a new MFA code for the authenticated user"""
+    user = request.user
+    
+    if not user.is_mfa_enabled:
+        return Response(
+            {'error': 'MFA is not enabled for this user'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Generate new code
+    code = user.generate_mfa_code()
+    
+    # Log code generation
+    AuditLog.log_activity(
+        user=user,
+        action='generate_mfa_code',
+        resource_type='user',
+        resource_id=user.id,
+        resource_name=user.email,
+        details={'code_generated': True},
+        request=request
+    )
+    
+    return Response({
+        'code': code,
+        'expires_at': user.mfa_code_expires.isoformat(),
+        'message': 'New MFA code generated successfully'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def mfa_generate_backup_codes(request):
+    """Generate backup codes for MFA"""
+    user = request.user
+    
+    if not user.is_mfa_enabled:
+        return Response(
+            {'error': 'MFA is not enabled for this user'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Generate backup codes
+    codes = user.generate_backup_codes()
+      # Log backup code generation
+    AuditLog.log_activity(
+        user=user,
+        action='create',
+        resource_type='user',
+        resource_id=user.id,
+        resource_name=user.email,
+        details={'action_type': 'generate_backup_codes', 'codes_count': len(codes)},
+        request=request
+    )
+    
+    return Response({
+        'backup_codes': codes,
+        'message': f'{len(codes)} backup codes generated successfully',
+        'instructions': 'Save these codes in a secure place. Each code can only be used once.'
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def mfa_backup_codes_status(request):
+    """Get the status of backup codes"""
+    user = request.user
+    
+    if not user.is_mfa_enabled:
+        return Response(
+            {'error': 'MFA is not enabled for this user'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    return Response({
+        'total_codes': len(user.mfa_backup_codes) if user.mfa_backup_codes else 0,
+        'remaining_codes': len(user.mfa_backup_codes) if user.mfa_backup_codes else 0,
+        'has_codes': bool(user.mfa_backup_codes)
+    })
+
+
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """Get and update user profile"""
     serializer_class = UserProfileSerializer
@@ -213,14 +299,9 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
-    
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        
-        # Prevent editing hear_about if it already has a value
-        if instance.hear_about and 'hear_about' in request.data:
-            request.data.pop('hear_about')
         
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -289,14 +370,14 @@ class AvatarUploadView(generics.UpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        
-        # Log avatar upload
+          # Log avatar upload
         AuditLog.log_activity(
             user=request.user,
-            action='avatar_upload',
+            action='upload',
             resource_type='user',
             resource_id=request.user.id,
             resource_name=request.user.email,
+            details={'action_type': 'avatar_upload'},
             request=request
         )
         
@@ -316,14 +397,14 @@ class AvatarDeleteView(generics.GenericAPIView):
         if user.avatar:
             user.avatar.delete()
             user.save()
-            
-            # Log avatar deletion
+              # Log avatar deletion
             AuditLog.log_activity(
                 user=request.user,
-                action='avatar_delete',
+                action='delete',
                 resource_type='user',
                 resource_id=request.user.id,
                 resource_name=request.user.email,
+                details={'action_type': 'avatar_delete'},
                 request=request
             )
             

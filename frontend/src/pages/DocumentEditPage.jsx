@@ -23,9 +23,7 @@ export default function DocumentEditPage() {
   const { data: document, isLoading: documentLoading, error: documentError } = useQuery({
     queryKey: ['document', id],
     queryFn: () => documentsAPI.getDocument(id),
-  });
-
-  // Fetch available tags
+  });  // Fetch available tags
   const { data: availableTags } = useQuery({
     queryKey: ['tags'],
     queryFn: tagsAPI.getTags,
