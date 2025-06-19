@@ -110,8 +110,7 @@ function SignupPage() {
               hearAbout: '',
               purpose: '',
             }}
-            validationSchema={SignupSchema}
-            onSubmit={(values, { setSubmitting }) => {
+            validationSchema={SignupSchema}            onSubmit={(values, { setSubmitting }) => {
               const transformedData = {
                 username: values.username,
                 email: values.email,
@@ -119,6 +118,9 @@ function SignupPage() {
                 password_confirm: values.confirmPassword,
                 first_name: values.firstName,
                 last_name: values.lastName,
+                job_title: values.jobTitle,
+                hear_about: values.hearAbout,
+                purpose: values.purpose,
               };
               
               mutation.mutate(transformedData, {
