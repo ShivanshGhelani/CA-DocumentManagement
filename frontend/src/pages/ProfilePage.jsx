@@ -537,14 +537,9 @@ export default function ProfilePage() {
                     hear_about: profile?.hear_about || '',
                   }}
                   validationSchema={profileSchema}
-                  enableReinitialize                  onSubmit={(values, { setSubmitting }) => {
-                    // Remove hear_about from submission if it's already set
-                    const submitValues = { ...values };
-                    if (profile?.hear_about) {
-                      delete submitValues.hear_about;
-                    }
-                    
-                    profileMutation.mutate(submitValues, {
+                  enableReinitialize
+                  onSubmit={(values, { setSubmitting }) => {
+                    profileMutation.mutate(values, {
                       onSettled: () => setSubmitting(false),
                     });
                   }}
@@ -558,42 +553,9 @@ export default function ProfilePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
                           Basic Information
-                        </h3>                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Username
-                            </label>
-                            <input
-                              type="text"
-                              value={profile?.username || ''}
-                              disabled
-                              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
-                          </div>
+                        </h3>
 
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Email Address
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="email"
-                                value={profile?.email || ''}
-                                disabled
-                                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
-                              />
-                              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 012 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                              </div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">Email cannot be changed for security reasons</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               First Name *
@@ -619,6 +581,26 @@ export default function ProfilePage() {
                             />
                             <ErrorMessage name="last_name" component="div" className="text-red-500 text-sm mt-1" />
                           </div>
+                        </div>
+
+                        <div className="mt-6">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="email"
+                              value={profile?.email || ''}
+                              disabled
+                              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 012 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">Email cannot be changed for security reasons</p>
                         </div>
                       </div>
 

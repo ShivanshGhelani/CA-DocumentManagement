@@ -17,6 +17,8 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - ./backend/.env
     container_name: django_backend
     command: python manage.py runserver 0.0.0.0:8000
     environment:
