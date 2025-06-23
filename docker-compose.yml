@@ -27,8 +27,11 @@ services:
       - DB_PASSWORD=shiv9090
       - DB_HOST=db
       - DB_PORT=5432
+      # AWS credentials and config are loaded from .env file via env_file above
+      
     ports:
       - "8000:8000"
+
     volumes:
       - ./backend:/app
       - /app/__pycache__

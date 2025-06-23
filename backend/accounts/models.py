@@ -9,10 +9,13 @@ from django.utils import timezone
 
 
 def user_avatar_path(instance, filename):
-    """Generate upload path for user avatars"""
+    """Generate upload path for user avatars with timestamp for uniqueness"""
     ext = filename.split('.')[-1]
-    filename = f"avatar_{instance.id}.{ext}"
-    return os.path.join('avatars', filename)
+    username = instance.username if hasattr(instance, 'username') else str(instance.id)
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"{username}_{timestamp}.{ext}"
+    return os.path.join('avatars', 'username', filename)
+ 
 
 
 class User(AbstractUser):

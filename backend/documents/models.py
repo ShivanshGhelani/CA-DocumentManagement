@@ -8,12 +8,17 @@ import os
 
 User = get_user_model()
 
-
 def document_upload_path(instance, filename):
-    """Generate upload path for documents"""
+    """Generate structured upload path for S3: documents/{username}/{original_name}/{uuid.ext}"""
     ext = filename.split('.')[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
-    return os.path.join('documents', str(instance.created_by.id), filename)
+    original_name = os.path.splitext(filename)[0]  # Remove extension
+    unique_filename = f"{uuid.uuid4()}.{ext}"
+    
+    # Make sure username is safe for paths
+    username = str(instance.created_by.username).replace(" ", "_")
+    
+    return f"documents/{username}/{original_name}/{unique_filename}"
+
 
 
 class DocumentManager(models.Manager):
