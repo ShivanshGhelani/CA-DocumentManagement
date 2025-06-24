@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, use } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
@@ -54,10 +54,11 @@ export default function ProfilePage() {
   const imgRef = useRef(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [passwordStrength, setPasswordStrength] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);  const [showPasswords, setShowPasswords] = useState({
+  const [avatarPreview, setAvatarPreview] = useState(null); const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
-    confirm: false,  });  const [showAvatarEdit, setShowAvatarEdit] = useState(false);
+    confirm: false,
+  }); const [showAvatarEdit, setShowAvatarEdit] = useState(false);
   const [backupCodes, setBackupCodes] = useState([]);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
 
@@ -180,7 +181,8 @@ export default function ProfilePage() {
       console.error('MFA disable error:', error);
       const message = error.response?.data?.detail || 'Failed to disable MFA';
       alert(message);
-    }  });
+    }
+  });
 
   // Backup codes functions
   const generateBackupCodes = async () => {
@@ -206,7 +208,7 @@ export default function ProfilePage() {
       `Backup Codes:\n${codesText}\n\n` +
       `Note: Do not share these codes with anyone.`
     ], { type: 'text/plain' });
-    
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -387,20 +389,20 @@ export default function ProfilePage() {
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8">            {/* Avatar Section */}
             <div className="relative group avatar-edit-container">
-              <div 
+              <div
                 className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden bg-white shadow-2xl ring-4 ring-white/20 cursor-pointer"
                 onClick={() => setShowAvatarEdit(!showAvatarEdit)}
               >                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-6xl md:text-7xl">
-                    {getInitials(profile)}
-                  </div>
-                )}
-                
+                <img
+                  src={profile.avatar_url}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-6xl md:text-7xl">
+                  {getInitials(profile)}
+                </div>
+              )}
+
                 {/* Hover Overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-full">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -481,8 +483,8 @@ export default function ProfilePage() {
             <button
               onClick={() => setActiveTab('profile')}
               className={`flex-1 flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'profile'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                 }`}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -493,8 +495,8 @@ export default function ProfilePage() {
             <button
               onClick={() => setActiveTab('password')}
               className={`flex-1 flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'password'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                 }`}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -505,8 +507,8 @@ export default function ProfilePage() {
             <button
               onClick={() => setActiveTab('security')}
               className={`flex-1 flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'security'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
                 }`}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -530,6 +532,7 @@ export default function ProfilePage() {
 
                 <Formik
                   initialValues={{
+                    username: profile?.username || '',
                     first_name: profile?.first_name || '',
                     last_name: profile?.last_name || '',
                     job_title: profile?.job_title || '',
@@ -555,8 +558,9 @@ export default function ProfilePage() {
                           Basic Information
                         </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                           <div>
+
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               First Name *
                             </label>
@@ -582,25 +586,40 @@ export default function ProfilePage() {
                             <ErrorMessage name="last_name" component="div" className="text-red-500 text-sm mt-1" />
                           </div>
                         </div>
-
-                        <div className="mt-6">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="email"
-                              value={profile?.email || ''}
-                              disabled
-                              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
+                        { /* Username and Email Card */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Username *
+                            </label>
+                            <Field
+                              type="text"
+                              name="username"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                              placeholder="Enter your username"
                             />
-                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 012 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                              </svg>
-                            </div>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">Email cannot be changed for security reasons</p>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Email Address
+                            </label>
+                            <div className="relative flex flex-1 items-center space-x-2">
+                              <input
+                                type="email"
+                                value={profile?.email || ''}
+                                disabled
+                                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed"
+                                placeholder="Email cannot be changed"
+
+                              />
+                              <div className="flex items-center justify-center p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors duration-200 cursor-not-allowed">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 012 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Email cannot be changed for security reasons</p>
+                          </div>
                         </div>
                       </div>
 
@@ -636,7 +655,7 @@ export default function ProfilePage() {
                           Additional Information
                         </h3>
 
-                        <div className="space-y-6">
+                        <div className="space-y-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               Purpose
@@ -644,7 +663,7 @@ export default function ProfilePage() {
                             <Field
                               as="textarea"
                               name="purpose"
-                              rows={3}
+                              rows={1}
                               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
                               placeholder="What do you plan to use this system for?"
                             />
@@ -660,8 +679,8 @@ export default function ProfilePage() {
                               name="hear_about"
                               disabled={!!profile?.hear_about}
                               className={`w-full px-4 py-3 border border-gray-300 rounded-lg transition-all duration-200 ${profile?.hear_about
-                                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                                  : 'focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                : 'focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                                 }`}
                               placeholder={profile?.hear_about ? '' : "e.g., Google search, friend referral, social media"}
                             />
@@ -801,7 +820,7 @@ export default function ProfilePage() {
                                 <div className="flex justify-between items-center mb-2">
                                   <span className="text-sm font-medium text-gray-700">Password strength:</span>
                                   <span className={`text-sm font-medium ${passwordStrength.strength === 'strong' ? 'text-green-600' :
-                                      passwordStrength.strength === 'medium' ? 'text-yellow-600' : 'text-red-600'
+                                    passwordStrength.strength === 'medium' ? 'text-yellow-600' : 'text-red-600'
                                     }`}>
                                     {passwordStrength.strength.charAt(0).toUpperCase() + passwordStrength.strength.slice(1)}
                                   </span>
@@ -809,7 +828,7 @@ export default function ProfilePage() {
                                 <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
                                     className={`h-2 rounded-full transition-all duration-300 ${passwordStrength.strength === 'strong' ? 'bg-green-500 w-full' :
-                                        passwordStrength.strength === 'medium' ? 'bg-yellow-500 w-2/3' : 'bg-red-500 w-1/3'
+                                      passwordStrength.strength === 'medium' ? 'bg-yellow-500 w-2/3' : 'bg-red-500 w-1/3'
                                       }`}
                                   ></div>
                                 </div>
@@ -944,11 +963,11 @@ export default function ProfilePage() {
 
                         <div className="flex space-x-3">
                           {profile?.is_mfa_enabled ? (
-                            <button                              onClick={() => {
-                                if (confirm('Are you sure you want to disable two-factor authentication? This will make your account less secure.')) {
-                                  mfaDisableMutation.mutate();
-                                }
-                              }}
+                            <button onClick={() => {
+                              if (confirm('Are you sure you want to disable two-factor authentication? This will make your account less secure.')) {
+                                mfaDisableMutation.mutate();
+                              }
+                            }}
                               disabled={mfaDisableMutation.isPending}
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 transition-all duration-200 font-medium flex items-center"
                             >
@@ -1001,7 +1020,7 @@ export default function ProfilePage() {
                             </svg>
                           </div>
                         </div>
-                        
+
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900 mb-2">
                             Two-Factor Authentication Active
@@ -1009,14 +1028,14 @@ export default function ProfilePage() {
                           <p className="text-gray-600 mb-4">
                             Your account is protected with 2FA. Generate backup codes to ensure you can always access your account.
                           </p>
-                          
+
                           {/* Backup Codes Section */}
                           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                             <h4 className="text-lg font-semibold text-gray-900 mb-2">Backup Codes</h4>
                             <p className="text-gray-600 mb-3">
                               Generate backup codes that you can use for login when you don't have access to your primary device.
                             </p>
-                            
+
                             <div className="flex space-x-3">
                               <button
                                 onClick={generateBackupCodes}
@@ -1027,7 +1046,7 @@ export default function ProfilePage() {
                                 </svg>
                                 Generate Backup Codes
                               </button>
-                              
+
                               {backupCodes.length > 0 && (
                                 <button
                                   onClick={downloadBackupCodes}
