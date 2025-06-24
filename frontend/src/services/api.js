@@ -1,5 +1,12 @@
 import apiClient from './axios';
 
+export const usersAPI = {
+  getUsers: async () => {
+    const response = await apiClient.get('/auth/users/');
+    return response.data;
+  }
+};
+
 // Authentication API
 export const authAPI = {
   // User registration

@@ -63,7 +63,7 @@ export default function DocumentDetailPage() {
   const handleViewDocument = async () => {
     try {
       // First, get the download URL
-      const response = await apiClient.get(`/api/documents/${id}/download/`);
+      const response = await apiClient.get(`/documents/${id}/download/`);
       const downloadUrl = response.data.download_url;
       
       // Fetch the document content

@@ -11,6 +11,9 @@ from .serializers import (
 )
 from .filters import DocumentFilter
 from audit.models import AuditLog
+import json
+import boto3
+from django.conf import settings
 
 
 class TagListCreateView(generics.ListCreateAPIView):
@@ -91,18 +94,25 @@ class DocumentListView(generics.ListAPIView):
     
     def get_queryset(self):
         user = self.request.user
-        
-        # Get documents created by user or shared with user using Q objects
-        queryset = Document.objects.filter(
-            Q(created_by=user) | Q(access_permissions__user=user)
-        ).distinct()        # Handle tags filtering explicitly
-        tag_ids = self.request.query_params.getlist('tags[]')  # Frontend sends as tags[]
-        if not tag_ids:
-            tag_ids = self.request.query_params.getlist('tags')  # Fallback to tags
+
+        queryset = Document.objects.all()
+
+        # Published docs visible to everyone
+        published_qs = Q(status='published')
+
+        # Drafts & archived only visible to the owner
+        owned_qs = Q(created_by=user) & ~Q(status='published')
+
+        # Docs explicitly shared with the user
+        shared_qs = Q(access_permissions__user=user)
+
+        queryset = queryset.filter(published_qs | owned_qs | shared_qs).distinct()
+
+        # Tag filtering
+        tag_ids = self.request.query_params.getlist('tags[]') or self.request.query_params.getlist('tags')
         if tag_ids:
-            # Filter to include documents that have ANY of the selected tags
             queryset = queryset.filter(tags__id__in=tag_ids).distinct()
-        
+
         return queryset
     
     def list(self, request, *args, **kwargs):
@@ -123,14 +133,39 @@ class DocumentListView(generics.ListAPIView):
 
 
 class DocumentCreateView(generics.CreateAPIView):
-    """Create new document"""
     serializer_class = DocumentCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def perform_create(self, serializer):
-        document = serializer.save()
-        
-        # Log document creation
+        document = serializer.save()  # Uploads file to S3 via django-storages
+
+        tags_data = self.request.data.get('tags_data')
+        if isinstance(tags_data, str):
+            tags_data = json.loads(tags_data)
+
+        if document.file and tags_data:
+            # Prepare TagSet for S3
+            tag_set = [
+                {'Key': tag['key'], 'Value': tag.get('value', '')}
+                for tag in tags_data
+            ]
+
+            # S3 client
+            s3_client = boto3.client(
+                "s3",
+                region_name=settings.AWS_S3_REGION_NAME,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            )
+            
+            # document.file.name is the S3 key path (e.g. "uploads/my-file.pdf")
+            s3_client.put_object_tagging(
+                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                Key=document.file.name,
+                Tagging={'TagSet': tag_set}
+            )
+
+        # Audit log
         AuditLog.log_activity(
             user=self.request.user,
             action='create',
@@ -146,18 +181,16 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, and delete documents"""
     serializer_class = DocumentDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
-        
-        # Get documents created by user or shared with user using Q objects
+        # Return documents owned by user or shared with user (any permission)
         return Document.objects.filter(
             Q(created_by=user) | Q(access_permissions__user=user)
         ).distinct()
-    
+
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        
         # Log document access
         AuditLog.log_activity(
             user=request.user,
@@ -168,67 +201,39 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
             content_object=instance,
             request=request
         )
-        
         return super().retrieve(request, *args, **kwargs)
-    
+
     def perform_update(self, serializer):
         instance = self.get_object()
-        
-        # Check edit permissions
-        if not self._can_edit(instance):
-            raise Http404("You don't have permission to edit this document")
-        
+        user = self.request.user
+        if instance.created_by != user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to edit this document.")
         document = serializer.save()
-        
-        # Log document update
         AuditLog.log_activity(
-            user=self.request.user,            action='update',
+            user=user,
+            action='update',
             resource_type='document',
             resource_id=str(document.id),
             resource_name=document.title,
             content_object=document,
             request=self.request
         )
-    
+
     def perform_destroy(self, instance):
-        # Check delete permissions
-        if not self._can_delete(instance):
-            raise Http404("You don't have permission to delete this document")
-        
-        # Perform soft delete instead of hard delete
-        instance.soft_delete(self.request.user)
-        
-        # Log document deletion
+        user = self.request.user
+        if instance.created_by != user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to delete this document.")
+        instance.soft_delete(user)
         AuditLog.log_activity(
-            user=self.request.user,
+            user=user,
             action='soft_delete',
             resource_type='document',
             resource_id=str(instance.id),
             resource_name=instance.title,
             request=self.request
         )
-    
-    def _can_edit(self, document):
-        user = self.request.user
-        if document.created_by == user:
-            return True
-        
-        access = document.access_permissions.filter(
-            user=user,
-            permission__in=['write', 'admin']
-        ).first()
-        return bool(access)
-    
-    def _can_delete(self, document):
-        user = self.request.user
-        if document.created_by == user:
-            return True
-        
-        access = document.access_permissions.filter(
-            user=user,
-            permission='admin'
-        ).first()
-        return bool(access)
 
 
 @api_view(['POST'])

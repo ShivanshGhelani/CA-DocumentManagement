@@ -14,6 +14,16 @@ from audit.models import AuditLog
 User = get_user_model()
 
 
+# from rest_framework import generics, permissions
+from .models import User
+from .serializers import UserDetailSerializer
+
+class UserListView(generics.ListAPIView):
+    queryset = User.objects.all().order_by('id')
+    serializer_class = UserDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
 class UserRegistrationView(generics.CreateAPIView):
     """User registration endpoint"""
     queryset = User.objects.all()
@@ -439,3 +449,6 @@ def logout(request):
     )
     
     return Response({'message': 'Logout successful'})
+
+
+

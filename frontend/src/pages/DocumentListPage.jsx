@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth.jsx';
-
+import { usersAPI } from '../services/api';
 // Debounce hook
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -25,7 +25,6 @@ export default function DocumentListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -35,20 +34,33 @@ export default function DocumentListPage() {
     created_date_to: '',
     tags: []
   });
-
+  const { data: usersData } = useQuery({
+  queryKey: ['users'],
+  queryFn: usersAPI.getUsers,
+  });
   const [searchInput, setSearchInput] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Debounce search input
   const debouncedSearch = useDebounce(searchInput, 500);
+
 
   // Update filters when debounced search changes
   useEffect(() => {
     setFilters(prev => ({ ...prev, search: debouncedSearch }));
   }, [debouncedSearch]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const user = localStorage.getItem('user');
+      if (user) {
+        setCurrentUser(JSON.parse(user));
+      }
+    }
+  }, []);
   // Prepare filters for API (remove empty values and ensure date format)
   const getApiFilters = () => {
     const apiFilters = { ...filters };
@@ -122,7 +134,8 @@ export default function DocumentListPage() {
       const displayName = user.first_name && user.last_name
         ? `${user.first_name} ${user.last_name}`
         : user.email;
-      return [user.email, {
+      return [user.id, {
+        id: user.id,
         email: user.email,
         displayName: displayName
       }];
@@ -191,7 +204,8 @@ export default function DocumentListPage() {
             </svg>
             Upload Document
           </button>
-        </div>        {/* Search and Filters */}
+        </div>        
+        {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <div className="space-y-4">
             {/* Search Bar */}
@@ -214,16 +228,16 @@ export default function DocumentListPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Created By Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>                
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
                 <select
                   value={filters.created_by}
                   onChange={(e) => handleFilterChange('created_by', e.target.value)}
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Users</option>
-                  {uniqueCreators.map((creator) => (
-                    <option key={creator.email} value={creator.email}>
-                      {creator.displayName}
+                  {(usersData?.results || []).map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email}
                     </option>
                   ))}
                 </select>
@@ -265,7 +279,8 @@ export default function DocumentListPage() {
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>            {/* Tags Filter */}
+            </div>
+            {/* Tags Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Tags</label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -276,8 +291,8 @@ export default function DocumentListPage() {
                       onClick={() => handleTagSelect(tag)}
                       disabled={selectedTags.find(t => t.id === tag.id)}
                       className={`px-3 py-1 rounded-full text-sm border transition-colors ${selectedTags.find(t => t.id === tag.id)
-                          ? 'bg-blue-100 text-blue-800 border-blue-300 cursor-not-allowed'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        ? 'bg-blue-100 text-blue-800 border-blue-300 cursor-not-allowed'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                         }`}
                     >
                       {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
@@ -426,51 +441,63 @@ export default function DocumentListPage() {
                       <td className="px-3 py-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${doc.status === 'published'
-                              ? 'bg-green-100 text-green-800'
-                              : doc.status === 'draft'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-100 text-green-800'
+                            : doc.status === 'draft'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
                             }`}
                         >
                           {doc.status}
                         </span>
                       </td>
                       {/* Actions */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => navigate(`/documents/${doc.id}`)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                            title="View document details"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            View
-                          </button>
-                          <button
-                            onClick={() => navigate(`/documents/${doc.id}/edit`)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
-                            title="Edit document"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(doc)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                            title="Delete document"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                      {currentUser && (
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-1">
+                            {/* View Button - Visible to all */}
+                            <button
+                              onClick={() => navigate(`/documents/${doc.id}`)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                              title="View document details"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View
+                            </button>
+
+                            {/* Check ownership before showing Edit and Delete */}
+                            {String(currentUser?.first_name) === String(doc.created_by.first_name) && (
+                              <>
+                                {/* Edit Button */}
+                                <button
+                                  onClick={() => navigate(`/documents/${doc.id}/edit`)}
+                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
+                                  title="Edit document"
+                                >
+                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  Edit
+                                </button>
+
+                                {/* Delete Button */}
+                                <button
+                                  onClick={() => handleDeleteClick(doc)}
+                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                                  title="Delete document"
+                                >
+                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -527,14 +554,14 @@ export default function DocumentListPage() {
                   Are you sure you want to delete "{documentToDelete?.title}"? This action cannot be undone.
                 </p>
               </div>
-              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">                
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
                 <button
-                onClick={() => setDeleteModalOpen(false)}
-                disabled={deleteMutation.isPending}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
+                  onClick={() => setDeleteModalOpen(false)}
+                  disabled={deleteMutation.isPending}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={confirmDelete}
                   disabled={deleteMutation.isPending}
