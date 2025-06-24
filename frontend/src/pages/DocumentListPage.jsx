@@ -49,9 +49,28 @@ export default function DocumentListPage() {
     setFilters(prev => ({ ...prev, search: debouncedSearch }));
   }, [debouncedSearch]);
 
+  // Prepare filters for API (remove empty values and ensure date format)
+  const getApiFilters = () => {
+    const apiFilters = { ...filters };
+    // Remove empty filters
+    Object.keys(apiFilters).forEach((key) => {
+      if (apiFilters[key] === '' || apiFilters[key] == null || (Array.isArray(apiFilters[key]) && apiFilters[key].length === 0)) {
+        delete apiFilters[key];
+      }
+    });
+    // Ensure date format is YYYY-MM-DD
+    if (apiFilters.created_date_from) {
+      apiFilters.created_date_from = apiFilters.created_date_from.slice(0, 10);
+    }
+    if (apiFilters.created_date_to) {
+      apiFilters.created_date_to = apiFilters.created_date_to.slice(0, 10);
+    }
+    return apiFilters;
+  };
+
   const { data: documentsData, isLoading: documentsLoading, error } = useQuery({
     queryKey: ['documents', filters],
-    queryFn: () => documentsAPI.getDocuments(filters),
+    queryFn: () => documentsAPI.getDocuments(getApiFilters()),
     keepPreviousData: true,
   });  // Fetch available tags for filter
   const { data: availableTags } = useQuery({
@@ -195,7 +214,8 @@ export default function DocumentListPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Created By Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>                <select
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>                
+                <select
                   value={filters.created_by}
                   onChange={(e) => handleFilterChange('created_by', e.target.value)}
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

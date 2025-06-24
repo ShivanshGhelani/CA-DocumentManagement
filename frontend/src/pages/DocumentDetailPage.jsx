@@ -4,21 +4,21 @@ import { useParams, useNavigate } from 'react-router';
 import apiClient from '../services/axios';
 
 const fetchDocument = async (id) => {
-  const { data } = await apiClient.get(`/api/documents/${id}/`);
+  const { data } = await apiClient.get(`/documents/${id}/`);
   return data;
 };
 
 const fetchDocumentVersions = async (id) => {
-  const { data } = await apiClient.get(`/api/documents/${id}/versions/`);
+  const { data } = await apiClient.get(`/documents/${id}/versions/`);
   return data;
 };
 
 const deleteDocument = async (id) => {
-  await apiClient.delete(`/api/documents/${id}/`);
+  await apiClient.delete(`/documents/${id}/`);
 };
 
 const rollbackDocument = async ({ id, versionId }) => {
-  const { data } = await apiClient.post(`/api/documents/${id}/rollback/`, { version_id: versionId });
+  const { data } = await apiClient.post(`/documents/${id}/rollback/`, { version_id: versionId });
   return data;
 };
 

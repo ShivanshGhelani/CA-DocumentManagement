@@ -9,6 +9,7 @@ from .serializers import (
     DocumentListSerializer, DocumentDetailSerializer, DocumentCreateSerializer,
     TagSerializer, DocumentVersionSerializer, DocumentAccessSerializer
 )
+from .filters import DocumentFilter
 from audit.models import AuditLog
 
 
@@ -83,7 +84,7 @@ class DocumentListView(generics.ListAPIView):
     serializer_class = DocumentListSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status', 'file_type', 'tags']
+    filterset_class = DocumentFilter
     search_fields = ['title', 'description']
     ordering_fields = ['created_at', 'updated_at', 'title']
     ordering = ['-updated_at']
