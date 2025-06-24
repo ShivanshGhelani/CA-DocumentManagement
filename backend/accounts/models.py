@@ -14,7 +14,7 @@ def user_avatar_path(instance, filename):
     username = instance.username if hasattr(instance, 'username') else str(instance.id)
     timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
     filename = f"{username}_{timestamp}.{ext}"
-    return os.path.join('avatars', 'username', filename)
+    return os.path.join('avatars', username, filename)
  
 
 

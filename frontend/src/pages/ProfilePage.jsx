@@ -118,7 +118,7 @@ export default function ProfilePage() {
     },
     onError: (error) => {
       console.error('Password change error:', error);
-      const message = error.response?.data?.detail || 'Failed to change password';
+      const message = error.response?.data?.detail || 'Failed to change password check your current password';
       alert(message);
     }
   });
