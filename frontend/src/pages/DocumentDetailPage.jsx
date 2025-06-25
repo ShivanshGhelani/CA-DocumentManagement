@@ -188,10 +188,10 @@ export default function DocumentDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50">
       {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="bg-white/ border-b mx-100 sticky top-0 z-10 backdrop-blur-lg">
+        <div className="max-w-7xl mx-auto px-4 py-4 lg:px-8 pb-0">
           {/* Breadcrumb */}
           <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
             <button
@@ -207,13 +207,18 @@ export default function DocumentDetailPage() {
           </nav>
 
           {/* Document Header */}
-          <div className="bg-white rounded-xl shadow border p-8 mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="bg-white/ rounded-xl  p-8 mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex items-start gap-5 flex-1 min-w-0">
-              <FileTypeIcon fileType={document.file_type} />
+                <div className="w-  16 h-16" fileType={document.file_type} >
+                <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                </div>
               <div className="min-w-0">
                 <h1 className="text-3xl font-bold text-gray-900 mb-1 truncate">{document.title}</h1>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 mb-2">
                   <span className="flex items-center gap-1">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     {document.created_by?.first_name} {document.created_by?.last_name}
                   </span>
@@ -270,10 +275,11 @@ export default function DocumentDetailPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content Area */}
-          <div className="lg:col-span-2">
+      <div className="max-w-7xl mx-auto px-4 py-8 pt-4">
+        <div className="grid grid-cols-12 gap-6 lg:gap-8">
+          {/* Main Content Area - 8 columns on large screens */}
+          <div className="col-span-12 lg:col-span-8 space-y-6">
+            {/* Document Overview Section */}
             {/* Tabs */}
             <div className="border-b border-gray-200 mb-6">
               <nav className="-mb-px flex space-x-8">
@@ -281,35 +287,41 @@ export default function DocumentDetailPage() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`py-3 px-4 border-b-2 font-medium text-base transition-colors flex items-center gap-3 ${
                       activeTab === tab.id
                         ? 'border-blue-500 text-blue-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
-                    <span className="mr-2">{tab.icon}</span>
+                    <span className="w-5 h-5">{tab.icon}</span>
                     {tab.label}
                   </button>
                 ))}
               </nav>
             </div>
             {/* Tab Content */}
-            <div className="bg-white rounded-xl shadow-sm border">
+            <div className="bg-white rounded-xl shadow-sm ">
               {activeTab === 'overview' && (
                 <div className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Document Overview</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Document Overview
+                  </h3>
                   {document.content ? (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <pre className="whitespace-pre-wrap text-sm text-gray-800">{document.content}</pre>
+                    <div className="bg-slate-50/50 rounded-xl p-6 border border-slate-200/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300">
+                      <pre className="whitespace-pre-wrap text-sm text-slate-800 font-mono">{document.content}</pre>
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="text-center py-12 px-6 bg-slate-50/50 rounded-xl border border-slate-200/60 backdrop-blur-sm">
+                      <div className="w-20 h-20 bg-slate-100/80 rounded-2xl flex items-center justify-center mx-auto mb-6 ring-1 ring-inset ring-slate-500/20 shadow-sm">
+                        <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
-                      <p className="text-gray-500">No preview available. Click "View" to open the document.</p>
+                      <p className="text-slate-600 font-medium">No preview available</p>
+                      <p className="text-slate-500 text-sm mt-2">Click "View" to open the document</p>
                     </div>
                   )}
                 </div>
@@ -317,23 +329,41 @@ export default function DocumentDetailPage() {
 
               {activeTab === 'details' && (
                 <div className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Document Details</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500 mb-1">File Type</label>
-                        <p className="text-gray-900">{document.file_type}</p>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-6 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Document Details
+                  </h3>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm">
+                        <label className="block text-sm font-medium text-slate-500 mb-2">File Type</label>
+                        <div className="flex items-center gap-3">
+                          <FileTypeIcon fileType={document.file_type} />
+                          <p className="text-slate-900 font-medium">{document.file_type}</p>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500 mb-1">File Size</label>
-                        <p className="text-gray-900">{document.file_size}</p>
+                      <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm">
+                        <label className="block text-sm font-medium text-slate-500 mb-2">File Size</label>
+                        <p className="text-slate-900 font-medium flex items-center gap-2">
+                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                          </svg>
+                          {formatFileSize(document.file_size)}
+                        </p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500 mb-1">Version</label>
-                        <p className="text-gray-900">{document.version}</p>
+                      <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm">
+                        <label className="block text-sm font-medium text-slate-500 mb-2">Version</label>
+                        <p className="text-slate-900 font-medium flex items-center gap-2">
+                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          {document.version}
+                        </p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500 mb-1">Status</label>
+                      <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm">
+                        <label className="block text-sm font-medium text-slate-500 mb-2">Status</label>
                         <StatusBadge status={document.status} />
                       </div>
                     </div>
@@ -386,10 +416,16 @@ export default function DocumentDetailPage() {
             </div>
           </div>
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="col-span-12 lg:col-span-4">
+            <div className="sticky top-24 space-y-6">
             {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <div className="bg-white/80 rounded-xl shadow-md border border-slate-200/60 p-6 backdrop-blur-sm hover:bg-white/90 hover:shadow-lg transition-all duration-300 mt-[4.25rem]">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Quick Actions
+              </h3>
               <div className="space-y-3">
                 <button
                   onClick={() => setShowVersions(true)}
@@ -423,25 +459,40 @@ export default function DocumentDetailPage() {
               </div>
             </div>
             {/* Document Info */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Document Info</h3>
+            <div className="bg-white/80 rounded-xl shadow-md border border-slate-200/60 p-6 backdrop-blur-sm hover:bg-white/90 hover:shadow-lg transition-all duration-300">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Document Info
+              </h3>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Owner</label>
-                  <div className="flex items-center">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  <label className="block text-sm font-medium text-slate-500 mb-2">Owner</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100/80 rounded-full flex items-center justify-center ring-1 ring-inset ring-blue-500/20 shadow-sm">
                       <span className="text-sm font-medium text-blue-700">{document.owner?.charAt(0)}</span>
                     </div>
-                    <span className="text-gray-900">{document.owner}</span>
+                    <span className="text-slate-900 font-medium">{document.owner}</span>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Created</label>
-                  <p className="text-gray-900">{new Date(document.created_at).toLocaleString()}</p>
+                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  <label className="block text-sm font-medium text-slate-500 mb-2">Created</label>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-slate-900 font-medium">{new Date(document.created_at).toLocaleString()}</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Last Modified</label>
-                  <p className="text-gray-900">{new Date(document.updated_at).toLocaleString()}</p>
+                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                  <label className="block text-sm font-medium text-slate-500 mb-2">Last Modified</label>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-slate-900 font-medium">{new Date(document.updated_at).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -466,20 +517,25 @@ export default function DocumentDetailPage() {
             </div>
             <div className="p-6 overflow-y-auto">
               {versions && (
-                <div className="space-y-4">
-                  {versions.map((version) => (
-                    <div key={version.version_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="flex items-center space-x-3">
-                          <span className="font-semibold text-gray-900">Version {version.version_id}</span>
-                          {version.version_id === document.version && (
-                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>
-                          )}
+                <div className="space-y-3">
+                    {versions.map((version) => (
+                      <div key={version.version_id} className="flex items-center justify-between p-4 bg-slate-50/50 rounded-xl border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all duration-300">
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-slate-900">Version {version.version_id}</span>
+                            {version.version_id === document.version && (
+                              <span className="bg-green-100/80 text-green-800 text-xs px-2.5 py-1 rounded-full ring-1 ring-inset ring-green-500/20 shadow-sm">Current</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 text-sm text-slate-600">
+                            <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center ring-1 ring-inset ring-slate-500/20">
+                              <span className="text-xs font-medium text-slate-600">{version.created_by?.charAt(0)}</span>
+                            </div>
+                            <span>{version.created_by}</span>
+                            <span className="text-slate-400">•</span>
+                            <span>{new Date(version.created_at).toLocaleString()}</span>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          By {version.created_by} on {new Date(version.created_at).toLocaleString()}
-                        </p>
-                      </div>
                       {version.version_id !== document.version && (
                         <button 
                           onClick={() => handleRollback(version.version_id)}
@@ -612,6 +668,8 @@ export default function DocumentDetailPage() {
           </div>
         </div>
       )}
+    </div>
+    {/* Version History Modal */}
     </div>
   );
 }
