@@ -7,6 +7,7 @@ class TagSerializer(serializers.ModelSerializer):
     """Serializer for Tag model with key-value support"""
     documents_count = serializers.SerializerMethodField()
     display_name = serializers.ReadOnlyField()
+    created_by = UserProfileSerializer(read_only=True)
     
     class Meta:
         model = Tag
@@ -166,7 +167,16 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             document.tags.set(tags)
         
         return document
-    
+    def get_can_view(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return (
+            obj.created_by == request.user or
+            obj.status == 'published' or
+            obj.access_permissions.filter(user=request.user).exists()
+        )
+
     def update(self, instance, validated_data):
         tag_ids = validated_data.pop('tag_ids', None)
         
