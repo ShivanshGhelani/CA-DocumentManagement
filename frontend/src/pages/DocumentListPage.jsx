@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
@@ -133,24 +132,54 @@ export default function DocumentListPage() {
     return null;
   }
 
-  // Filter documents based on showMode
-  const getFilteredDocuments = () => {
-    if (!documentsData?.results || !currentUser) return [];
-    
-    const allDocuments = documentsData.results;
-    
-    if (showMode === 'mine') {
-      // Show only documents created by current user
-      return allDocuments.filter(doc => 
-        doc.created_by && doc.created_by.id === currentUser.id
-      );
-    } else {
-      // Show only documents created by others (excluding current user)
-      return allDocuments.filter(doc => 
-        doc.created_by && doc.created_by.id !== currentUser.id
-      );
+const getFilteredDocuments = () => {
+  if (!documentsData?.results || !currentUser) return [];
+
+  return documentsData.results.filter(doc => {
+    // 1. ShowMode filter
+    if (showMode === 'mine' && doc.created_by?.username !== currentUser.username) return false;
+    if (showMode === 'all' && doc.created_by?.username === currentUser.username) return false;
+
+    // 2. Search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      if (
+        !doc.title?.toLowerCase().includes(searchTerm) &&
+        !doc.description?.toLowerCase().includes(searchTerm)
+      ) {
+        return false;
+      }
     }
-  };
+
+    // 3. Created_by filter (dropdown)
+    if (filters.created_by && doc.created_by?.id.toString() !== filters.created_by) {
+      return false;
+    }
+
+    // 4. Status filter
+    if (filters.status && doc.status !== filters.status) {
+      return false;
+    }
+
+    // 5. Date range filters
+    if (filters.created_date_from && new Date(doc.created_at) < new Date(filters.created_date_from)) {
+      return false;
+    }
+    if (filters.created_date_to && new Date(doc.created_at) > new Date(filters.created_date_to)) {
+      return false;
+    }
+
+    // 6. Tags filter
+    if (filters.tags && filters.tags.length > 0) {
+      const tagIds = doc.tags?.map(tag => tag.id) || [];
+      const hasAllTags = filters.tags.every(tagId => tagIds.includes(tagId));
+      if (!hasAllTags) return false;
+    }
+
+    return true;
+  });
+};
+
 
   const filteredDocuments = getFilteredDocuments();
 
@@ -171,6 +200,9 @@ export default function DocumentListPage() {
 
   // Ensure availableTags is an array
   const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
+
+  // Use users from backend only for the dropdown, excluding the current user
+  const usersDropdown = (usersData?.results || []).filter(u => !currentUser || u.id !== currentUser.id);
 
   const handleDeleteClick = (document) => {
     setDocumentToDelete(document);
@@ -282,7 +314,7 @@ export default function DocumentListPage() {
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Users</option>
-                  {(usersData?.results || []).map((user) => (
+                  {usersDropdown.map((user) => (
                     <option key={user.id} value={user.id}>
                       {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email}
                     </option>
@@ -391,14 +423,15 @@ export default function DocumentListPage() {
             className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${showMode === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             onClick={handleShowAll}
           >
-            All Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.id !== currentUser?.id).length : 0})
+            All Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.username !== currentUser?.username).length : 0})
+            {console.log(documentsData?.results)}
           </button>
           <button
             className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${showMode === 'mine' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             onClick={handleShowMine}
             disabled={!currentUser}
           >
-            My Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.id === currentUser?.id).length : 0})
+            My Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.username === currentUser?.username).length : 0})
           </button>
         </div>
         {/* Results */}
