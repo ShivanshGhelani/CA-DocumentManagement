@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { usersAPI } from '../services/api';
+
 // Debounce hook
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -35,18 +37,18 @@ export default function DocumentListPage() {
     tags: []
   });
   const { data: usersData } = useQuery({
-  queryKey: ['users'],
-  queryFn: usersAPI.getUsers,
+    queryKey: ['users'],
+    queryFn: usersAPI.getUsers,
   });
   const [searchInput, setSearchInput] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showMode, setShowMode] = useState('all'); // 'all' or 'mine'
 
   // Debounce search input
   const debouncedSearch = useDebounce(searchInput, 500);
-
 
   // Update filters when debounced search changes
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function DocumentListPage() {
       }
     }
   }, []);
+
   // Prepare filters for API (remove empty values and ensure date format)
   const getApiFilters = () => {
     const apiFilters = { ...filters };
@@ -84,7 +87,9 @@ export default function DocumentListPage() {
     queryKey: ['documents', filters],
     queryFn: () => documentsAPI.getDocuments(getApiFilters()),
     keepPreviousData: true,
-  });  // Fetch available tags for filter
+  });
+
+  // Fetch available tags for filter
   const { data: availableTags } = useQuery({
     queryKey: ['tags'],
     queryFn: tagsAPI.getTags,
@@ -126,7 +131,30 @@ export default function DocumentListPage() {
   // Don't render anything if not authenticated (will redirect)
   if (!isAuthenticated) {
     return null;
-  }  // Get unique creators for filter dropdown
+  }
+
+  // Filter documents based on showMode
+  const getFilteredDocuments = () => {
+    if (!documentsData?.results || !currentUser) return [];
+    
+    const allDocuments = documentsData.results;
+    
+    if (showMode === 'mine') {
+      // Show only documents created by current user
+      return allDocuments.filter(doc => 
+        doc.created_by && doc.created_by.id === currentUser.id
+      );
+    } else {
+      // Show only documents created by others (excluding current user)
+      return allDocuments.filter(doc => 
+        doc.created_by && doc.created_by.id !== currentUser.id
+      );
+    }
+  };
+
+  const filteredDocuments = getFilteredDocuments();
+
+  // Get unique creators for filter dropdown
   const uniqueCreators = documentsData?.results ?
     [...new Map(documentsData.results.map(doc => {
       if (!doc.created_by) return null;
@@ -187,9 +215,25 @@ export default function DocumentListPage() {
     setSelectedTags([]);
   };
 
+  // Update filters when toggling All/My Documents
+  const handleShowAll = () => {
+    setShowMode('all');
+    // Clear the created_by filter to show all documents (will be filtered client-side)
+    setFilters(prev => ({ ...prev, created_by: '' }));
+  };
+
+  const handleShowMine = () => {
+    if (currentUser) {
+      setShowMode('mine');
+      // Clear the created_by filter to show all documents (will be filtered client-side)
+      setFilters(prev => ({ ...prev, created_by: '' }));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">        {/* Header */}
+      <div className="max-w-7xl mx-auto px-4 py-8">        
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Document Dashboard</h1>
@@ -205,6 +249,9 @@ export default function DocumentListPage() {
             Upload Document
           </button>
         </div>        
+
+
+
         {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <div className="space-y-4">
@@ -280,6 +327,7 @@ export default function DocumentListPage() {
                 />
               </div>
             </div>
+
             {/* Tags Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Tags</label>
@@ -306,20 +354,21 @@ export default function DocumentListPage() {
               {/* Selected Tags */}
               {selectedTags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {selectedTags.map((tag) => (<span
-                    key={tag.id}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
-                  >
-                    {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
-                    <button
-                      onClick={() => handleTagRemove(tag.id)}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
+                  {selectedTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
+                      {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
+                      <button
+                        onClick={() => handleTagRemove(tag.id)}
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
                   ))}
                 </div>
               )}
@@ -336,7 +385,22 @@ export default function DocumentListPage() {
             </div>
           </div>
         </div>
-
+        {/* All/My Documents Toggle Buttons */}
+        <div className="flex gap-4 mb-6">
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${showMode === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+            onClick={handleShowAll}
+          >
+            All Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.id !== currentUser?.id).length : 0})
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${showMode === 'mine' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+            onClick={handleShowMine}
+            disabled={!currentUser}
+          >
+            My Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.id === currentUser?.id).length : 0})
+          </button>
+        </div>
         {/* Results */}
         {documentsLoading ? (
           <div className="flex justify-center items-center py-12">
@@ -375,7 +439,7 @@ export default function DocumentListPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {documentsData?.results?.map((doc) => (
+                  {filteredDocuments.map((doc) => (
                     <tr key={doc.id} className="hover:bg-gray-50">
                       {/* Document Title - Combined with description and mobile info */}
                       <td className="px-4 py-4 min-w-0">
@@ -468,7 +532,7 @@ export default function DocumentListPage() {
                             </button>
 
                             {/* Check ownership before showing Edit and Delete */}
-                            {String(currentUser?.first_name) === String(doc.created_by.first_name) && (
+                            {doc.created_by && currentUser && doc.created_by.first_name === currentUser.first_name && (
                               <>
                                 {/* Edit Button */}
                                 <button
