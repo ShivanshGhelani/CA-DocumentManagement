@@ -37,6 +37,7 @@ const profileSchema = Yup.object().shape({
 });
 
 const passwordSchema = Yup.object().shape({
+  username: Yup.string().required('Username is required'),
   old_password: Yup.string().required('Current password is required'),
   new_password: Yup.string()
     .min(8, 'Password must be at least 8 characters')
@@ -392,7 +393,8 @@ export default function ProfilePage() {
               <div
                 className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden bg-white shadow-2xl ring-4 ring-white/20 cursor-pointer"
                 onClick={() => setShowAvatarEdit(!showAvatarEdit)}
-              >                {profile?.avatar_url ? (
+              >                
+              {profile?.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt="Profile"

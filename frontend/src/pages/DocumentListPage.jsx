@@ -144,8 +144,13 @@ export default function DocumentListPage() {
 
     return documentsData.results.filter(doc => {
       // 1. ShowMode filter
-      if (showMode === 'mine' && doc.created_by?.username !== currentUser.username) return false;
-      if (showMode === 'all' && doc.created_by?.username === currentUser.username) return false;
+      if (showMode === 'mine' && doc.created_by?.username !== currentUser.username) {
+        return false;
+      }
+      // In 'all' mode, don't filter out documents by the current user if a specific user is selected
+      if (showMode === 'all' && !filters.created_by && doc.created_by?.username === currentUser.username) {
+        return false;
+      }
 
       // 2. Search filter
       if (filters.search) {
@@ -158,11 +163,21 @@ export default function DocumentListPage() {
         }
       }
 
-      // 3. Created By filter
-      if (filters.created_by && doc.created_by?.id?.toString() !== filters.created_by.toString()) {
-        return false;
+      // 3. Created By filter (only apply in 'all' mode)
+      if (showMode === 'all' && filters.created_by && filters.created_by !== '') {
+        // Make sure doc.created_by exists before comparing
+        if (!doc.created_by) {
+          return false;
+        }
+        
+        // Convert both to strings for comparison to avoid type issues
+        const docCreatorId = String(doc.created_by.id);
+        const filterCreatorId = String(filters.created_by);
+        
+        if (docCreatorId !== filterCreatorId) {
+          return false;
+        }
       }
-
 
       // 4. Status filter
       if (filters.status && doc.status !== filters.status) {
@@ -197,13 +212,9 @@ export default function DocumentListPage() {
       .filter(Boolean)
   );
 
+  // Modified to include all users except current user, regardless of whether they've created documents
   const usersDropdown = (usersData?.results || [])
-    .filter(user =>
-      user.id !== currentUser?.id && documentCreatorIds.has(user.id)
-    );
-
-
-
+    .filter(user => user.id !== currentUser?.id);
 
   // Ensure availableTags is an array
   const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
@@ -261,14 +272,14 @@ export default function DocumentListPage() {
   // Update filters when toggling All/My Documents
   const handleShowAll = () => {
     setShowMode('all');
-    // Clear the created_by filter to show all documents (will be filtered client-side)
+    // Clear the created_by filter when switching to all documents
     setFilters(prev => ({ ...prev, created_by: '' }));
   };
 
   const handleShowMine = () => {
     if (currentUser) {
       setShowMode('mine');
-      // Clear the created_by filter to show all documents (will be filtered client-side)
+      // Clear the created_by filter when switching to my documents (not applicable in mine mode)
       setFilters(prev => ({ ...prev, created_by: '' }));
     }
   };
@@ -315,26 +326,27 @@ export default function DocumentListPage() {
             </div>
 
             {/* Filters Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Created By Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
-                <select
-                  value={filters.created_by}
-                  onChange={(e) => handleFilterChange('created_by', e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                <option value="">All Users</option>
-                {usersDropdown.map((user) => (
-                  console.log("usersDropdown", usersDropdown),
-                  <option key={user.id} value={user.id}>
-                    {user.first_name || user.last_name
-                      ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                      : user.email || user.username || `User ${user.id}`}
-                  </option>
-                ))}
-                </select>
-              </div>
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${showMode === 'all' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
+              {/* Created By Filter - Only show in 'all' mode */}
+              {showMode === 'all' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
+                  <select
+                    value={filters.created_by}
+                    onChange={(e) => handleFilterChange('created_by', e.target.value)}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Users</option>
+                    {usersDropdown.map((user) => (
+                      <option key={user.id} value={String(user.id)}>
+                        {user.first_name || user.last_name
+                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                          : user.email || user.username || `User ${user.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
 
 
