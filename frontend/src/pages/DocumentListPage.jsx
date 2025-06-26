@@ -49,6 +49,32 @@ export default function DocumentListPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showMode, setShowMode] = useState('all'); // 'all' or 'mine'
 
+  // Remove useQuery for documents, only use localStorage for caching and filtering
+  // const { data: documentsData, isLoading: documentsDataumentsLoading, error } = useQuery({
+  //   queryKey: ['documentsDatauments', filters],
+  //   queryFn: () => documentsDataumentsAPI.getdocumentsDatauments(getApiFilters()),
+  //   keepPreviousData: true,
+  // });
+
+  // Remove all usages of documentsData and documentsDataumentsLoading, error for documents
+  // Use local state for loading
+  const [documentsLoading, setDocumentsLoading] = useState(true);
+  const [documentsError, setDocumentsError] = useState(null);
+
+  // Fetch all documents once and cache in localStorage
+  useEffect(() => {
+    setDocumentsLoading(true);
+    documentsAPI.getDocuments({})
+      .then(data => {
+        localStorage.setItem('allDocuments', JSON.stringify(data.results || []));
+        setDocumentsLoading(false);
+      })
+      .catch(err => {
+        setDocumentsError('Failed to load documents. Please try again.');
+        setDocumentsLoading(false);
+      });
+  }, []);
+
   // Debounce search input
   const debouncedSearch = useDebounce(searchInput, 500);
 
@@ -66,30 +92,24 @@ export default function DocumentListPage() {
     }
   }, []);
 
-  // Prepare filters for API (remove empty values and ensure date format)
-  const getApiFilters = () => {
-    const apiFilters = { ...filters };
-    // Remove empty filters
-    Object.keys(apiFilters).forEach((key) => {
-      if (apiFilters[key] === '' || apiFilters[key] == null || (Array.isArray(apiFilters[key]) && apiFilters[key].length === 0)) {
-        delete apiFilters[key];
-      }
-    });
-    // Ensure date format is YYYY-MM-DD
-    if (apiFilters.created_date_from) {
-      apiFilters.created_date_from = apiFilters.created_date_from.slice(0, 10);
-    }
-    if (apiFilters.created_date_to) {
-      apiFilters.created_date_to = apiFilters.created_date_to.slice(0, 10);
-    }
-    return apiFilters;
-  };
-
-  const { data: documentsData, isLoading: documentsLoading, error } = useQuery({
-    queryKey: ['documents', filters],
-    queryFn: () => documentsAPI.getDocuments(getApiFilters()),
-    keepPreviousData: true,
-  });
+  // // Prepare filters for API (remove empty values and ensure date format)
+  // const getApiFilters = () => {
+  //   const apiFilters = { ...filters };
+  //   // Remove empty filters
+  //   Object.keys(apiFilters).forEach((key) => {
+  //     if (apiFilters[key] === '' || apiFilters[key] == null || (Array.isArray(apiFilters[key]) && apiFilters[key].length === 0)) {
+  //       delete apiFilters[key];
+  //     }
+  //   });
+  //   // Ensure date format is YYYY-MM-DD
+  //   if (apiFilters.created_date_from) {
+  //     apiFilters.created_date_from = apiFilters.created_date_from.slice(0, 10);
+  //   }
+  //   if (apiFilters.created_date_to) {
+  //     apiFilters.created_date_to = apiFilters.created_date_to.slice(0, 10);
+  //   }
+  //   return apiFilters;
+  // };
 
   // Fetch available tags for filter
   const { data: availableTags } = useQuery({
@@ -103,9 +123,9 @@ export default function DocumentListPage() {
   // console.log('Available Tags:', availableTags);
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: documentsAPI.deleteDocument,
+    mutationFn: documentsAPI.deletedocument,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['documentsDatauments'] });
       setDeleteModalOpen(false);
       setDocumentToDelete(null);
     },
@@ -139,10 +159,21 @@ export default function DocumentListPage() {
     return null;
   }
 
-  const getFilteredDocuments = () => {
-    if (!documentsData?.results || !currentUser) return [];
+  // Helper to get all documents from cache
+  const getAllDocumentsFromCache = () => {
+    try {
+      const docs = localStorage.getItem('allDocuments');
+      return docs ? JSON.parse(docs) : [];
+    } catch {
+      return [];
+    }
+  };
 
-    return documentsData.results.filter(doc => {
+  // Use cached documents for filtering
+  const getFilteredDocuments = () => {
+    if (!currentUser) return [];
+    const allDocs = getAllDocumentsFromCache();
+    return allDocs.filter(doc => {
       // 1. ShowMode filter
       if (showMode === 'mine' && doc.created_by?.username !== currentUser.username) {
         return false;
@@ -165,16 +196,13 @@ export default function DocumentListPage() {
 
       // 3. Created By filter (only apply in 'all' mode)
       if (showMode === 'all' && filters.created_by && filters.created_by !== '') {
-        // Make sure doc.created_by exists before comparing
         if (!doc.created_by) {
           return false;
         }
-        
-        // Convert both to strings for comparison to avoid type issues
-        const docCreatorId = String(doc.created_by.id);
-        const filterCreatorId = String(filters.created_by);
-        
-        if (docCreatorId !== filterCreatorId) {
+        // Debug: log the values and types being compared
+        console.log('Dropdown filters.created_by:', filters.created_by, typeof filters.created_by);
+        console.log('Document doc.created_by.id:', doc.created_by.id, typeof doc.created_by.id);
+        if (String(doc.created_by.id) !== String(filters.created_by)) {
           return false;
         }
       }
@@ -206,15 +234,8 @@ export default function DocumentListPage() {
 
   const filteredDocuments = getFilteredDocuments();
 
-  const documentCreatorIds = new Set(
-    documentsData?.results
-      ?.map(doc => doc.created_by?.id)
-      .filter(Boolean)
-  );
-
   // Modified to include all users except current user, regardless of whether they've created documents
-  const usersDropdown = (usersData?.results || [])
-    .filter(user => user.id !== currentUser?.id);
+  const usersDropdown = (usersData?.results || []);
 
   // Ensure availableTags is an array
   const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
@@ -222,8 +243,8 @@ export default function DocumentListPage() {
   // Use users from backend only for the dropdown, excluding the current user
   // const usersDropdown = (usersData?.results || []).filter(u => !currentUser || u.id !== currentUser.id);
 
-  const handleDeleteClick = (document) => {
-    setDocumentToDelete(document);
+  const handleDeleteClick = (doc) => {
+    setDocumentToDelete(doc);
     setDeleteModalOpen(true);
   };
 
@@ -269,7 +290,7 @@ export default function DocumentListPage() {
     setSelectedTags([]);
   };
 
-  // Update filters when toggling All/My Documents
+  // Update filters when toggling All/My documents
   const handleShowAll = () => {
     setShowMode('all');
     // Clear the created_by filter when switching to all documents
@@ -307,7 +328,7 @@ export default function DocumentListPage() {
 
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-sm  border-t border-blue-600 p-6 mb-6">
           <div className="space-y-4">
             {/* Search Bar */}
             <div className="relative">
@@ -356,12 +377,11 @@ export default function DocumentListPage() {
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex justify-around w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Status</option>
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
-                  <option value="archived">Archived</option>
                 </select>
               </div>
 
@@ -459,21 +479,20 @@ export default function DocumentListPage() {
             </div>
           </div>
         </div>
-        {/* All/My Documents Toggle Buttons */}
+        {/* All/My documents Toggle Buttons */}
         <div className="flex gap-4 mb-6">
           <button
             className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${showMode === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             onClick={handleShowAll}
           >
-            All Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.username !== currentUser?.username).length : 0})
-            {/* {console.log(documentsData?.results)} */}
+            All documents ({getAllDocumentsFromCache().filter(doc => doc.created_by && doc.created_by.username !== currentUser?.username).length})
           </button>
           <button
             className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${showMode === 'mine' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             onClick={handleShowMine}
             disabled={!currentUser}
           >
-            My Documents ({documentsData?.results ? documentsData.results.filter(doc => doc.created_by && doc.created_by.username === currentUser?.username).length : 0})
+            My documents ({getAllDocumentsFromCache().filter(doc => doc.created_by && doc.created_by.username === currentUser?.username).length})
           </button>
         </div>
         {/* Results */}
@@ -481,9 +500,9 @@ export default function DocumentListPage() {
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
-        ) : error ? (
+        ) : documentsError ? (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-            Failed to load documents. Please try again.
+            {documentsError}
           </div>) : (
           <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -643,8 +662,8 @@ export default function DocumentListPage() {
               </table>
             </div>
 
-            {/* No Documents Found Alert */}
-            {documentsData?.results?.length === 0 && (
+            {/* No documents Found Alert */}
+            {filteredDocuments.length === 0 && (
               <div className="text-center py-16">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

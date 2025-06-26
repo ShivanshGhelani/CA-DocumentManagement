@@ -11,4 +11,5 @@ export default [
   route("documents/:id", "routes/document-detail.tsx"), // Added document detail route
   route("trash", "routes/trash.tsx"), // Added trash route
   route("profile", "routes/profile.tsx"), // Added profile route
+  route("archive", "routes/archive.tsx"), // Added archive route
 ] satisfies RouteConfig;

@@ -110,7 +110,8 @@ function SignupPage() {
               hearAbout: '',
               purpose: '',
             }}
-            validationSchema={SignupSchema}            onSubmit={(values, { setSubmitting }) => {
+            validationSchema={SignupSchema}            
+            onSubmit={(values, { setSubmitting }) => {
               const transformedData = {
                 username: values.username,
                 email: values.email,
