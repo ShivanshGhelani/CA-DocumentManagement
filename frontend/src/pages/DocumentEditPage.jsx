@@ -66,8 +66,12 @@ export default function DocumentEditPage() {
 
   // Set initial values when document loads
   useEffect(() => {
-    if (document?.tags) {
-      setSelectedTags(document.tags.map(tag => tag.id));
+    if (document) {
+      setTitle(document.title || '');
+      setDescription(document.description || '');
+      setStatus(document.status || 'draft');
+      setTags(document.tags ? document.tags.map(tag => ({ key: tag.key, value: tag.value })) : []);
+      setSelectedTags(document.tags ? document.tags.map(tag => tag.id) : []);
     }
   }, [document]);
 

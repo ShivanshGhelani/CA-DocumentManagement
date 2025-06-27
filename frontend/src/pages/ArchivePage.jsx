@@ -10,6 +10,7 @@ const ArchivePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [unarchivingId, setUnarchivingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -23,12 +24,25 @@ const ArchivePage = () => {
   const handleUnarchive = async (doc) => {
     setUnarchivingId(doc.id);
     try {
-      await documentsAPI.archiveDocument(doc.id, 'published'); // PATCH with status 'published'
+      await documentsAPI.archiveDocument(doc.id, 'published');
       setDocuments(prev => prev.filter(d => d.id !== doc.id));
     } catch {
       alert('Failed to unarchive document.');
     } finally {
       setUnarchivingId(null);
+    }
+  };
+
+  const handleDelete = async (doc) => {
+    if (!window.confirm('Are you sure you want to permanently delete this document? This action cannot be undone.')) return;
+    setDeletingId(doc.id);
+    try {
+      await documentsAPI.deletePermanently(doc.id);
+      setDocuments(prev => prev.filter(d => d.id !== doc.id));
+    } catch {
+      alert('Failed to delete document.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -80,6 +94,23 @@ const ArchivePage = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0h6" />
                               </svg>
                               Unarchive
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(doc)}
+                          disabled={deletingId === doc.id}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+                          title="Delete document"
+                        >
+                          {deletingId === doc.id ? (
+                            <span className="flex items-center"><span className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-2"></span>Deleting...</span>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
                             </>
                           )}
                         </button>
