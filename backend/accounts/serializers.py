@@ -101,6 +101,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
+            'id',
             'username', 'first_name', 'last_name', 'email', 'job_title', 
             'purpose', 'hear_about', 'avatar', 'avatar_url', 'phone_number',
             'is_mfa_enabled', 'date_joined'

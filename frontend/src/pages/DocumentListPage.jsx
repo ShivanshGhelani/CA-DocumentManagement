@@ -196,13 +196,15 @@ export default function DocumentListPage() {
 
       // 3. Created By filter (only apply in 'all' mode)
       if (showMode === 'all' && filters.created_by && filters.created_by !== '') {
-        if (!doc.created_by) {
+        // Find the selected user object from the dropdown by ID
+        const selectedUser = usersData?.results.find(u => String(u.id) === String(filters.created_by));
+        if (!selectedUser) return false;
+        // Defensive: ensure doc.created_by and doc.created_by.id exist
+        if (!doc.created_by || doc.created_by.id == null) {
           return false;
         }
-        // Debug: log the values and types being compared
-        console.log('Dropdown filters.created_by:', filters.created_by, typeof filters.created_by);
-        console.log('Document doc.created_by.id:', doc.created_by.id, typeof doc.created_by.id);
-        if (String(doc.created_by.id) !== String(filters.created_by)) {
+        // Compare document's created_by.id to selected user's id
+        if (String(doc.created_by.id) !== String(selectedUser.id)) {
           return false;
         }
       }
@@ -235,7 +237,7 @@ export default function DocumentListPage() {
   const filteredDocuments = getFilteredDocuments();
 
   // Modified to include all users except current user, regardless of whether they've created documents
-  const usersDropdown = (usersData?.results || []);
+  const usersDropdown = (usersData?.results || []).filter(u => !currentUser || String(u.id) !== String(currentUser.id));
 
   // Ensure availableTags is an array
   const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
