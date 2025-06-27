@@ -96,7 +96,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for user profile information"""
     avatar_url = serializers.SerializerMethodField()
     email = serializers.EmailField(read_only=True)  # Non-editable
-    username = serializers.CharField(read_only=True)  # Non-editable
+    username = serializers.CharField()  # Non-editable
     
     class Meta:
         model = User

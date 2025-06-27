@@ -125,8 +125,13 @@ class Document(models.Model):
 
     def save(self, *args, **kwargs):
         if self.file:
-            self.file_size = self.file.size
-            self.file_type = self.file.name.split('.')[-1].lower()
+            try:
+                self.file_size = self.file.size
+                self.file_type = self.file.name.split('.')[-1].lower()
+            except FileNotFoundError:
+                # File is missing from storage (e.g., S3); handle gracefully
+                self.file_size = None
+                self.file_type = None
         super().save(*args, **kwargs)
     
     def clean(self):

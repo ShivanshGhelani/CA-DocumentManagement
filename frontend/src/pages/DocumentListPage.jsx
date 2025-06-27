@@ -123,8 +123,12 @@ export default function DocumentListPage() {
   // console.log('Available Tags:', availableTags);
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: documentsAPI.deletedocument,
-    onSuccess: () => {
+    mutationFn: documentsAPI.deleteDocument,
+    onSuccess: (_, deletedId) => {
+      // Remove the deleted document from localStorage cache
+      const docs = getAllDocumentsFromCache();
+      const updatedDocs = docs.filter(doc => doc.id !== deletedId);
+      localStorage.setItem('allDocuments', JSON.stringify(updatedDocs));
       queryClient.invalidateQueries({ queryKey: ['documentsDatauments'] });
       setDeleteModalOpen(false);
       setDocumentToDelete(null);
@@ -628,7 +632,7 @@ export default function DocumentListPage() {
                             </button>
 
                             {/* Check ownership before showing Edit and Delete */}
-                            {doc.created_by && currentUser && doc.created_by.first_name === currentUser.first_name && (
+                            {doc.created_by && currentUser && doc.created_by.id === currentUser.id && (
                               <>
                                 {/* Edit Button */}
                                 <button
@@ -640,6 +644,26 @@ export default function DocumentListPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                   Edit
+                                </button>
+
+                                {/* Archive Button */}
+                                <button
+                                  onClick={async () => {
+                                    await documentsAPI.archiveDocument(doc.id);
+                                    // Remove from local cache
+                                    const docs = getAllDocumentsFromCache();
+                                    const updatedDocs = docs.filter(d => d.id !== doc.id);
+                                    localStorage.setItem('allDocuments', JSON.stringify(updatedDocs));
+                                    // Optionally, trigger a re-render
+                                    setFilters(f => ({ ...f }));
+                                  }}
+                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-400 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                  title="Archive"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                                  </svg>
+
                                 </button>
 
                                 {/* Delete Button */}

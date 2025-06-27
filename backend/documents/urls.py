@@ -14,6 +14,7 @@ urlpatterns = [    # Tags
     path('documents/<uuid:pk>/download/', views.document_download, name='document-download'),
     path('documents/<uuid:pk>/share/', views.document_share, name='document-share'),
     path('documents/<uuid:pk>/restore/', views.restore_document, name='document-restore'),
+    path('documents/<uuid:pk>/permanent/', views.permanent_delete_document, name='document-permanent-delete'),
     
     # Document Versions
     path('documents/<uuid:document_id>/versions/', views.DocumentVersionListView.as_view(), name='document-versions'),

@@ -200,6 +200,18 @@ export const documentsAPI = {
     const response = await apiClient.get(`/documents/${documentId}/versions/`);
     return response.data;
   },
+
+  // Permanently delete document
+  deletePermanently: async (id) => {
+    const response = await apiClient.delete(`/documents/${id}/permanent/`);
+    return response.data;
+  },
+
+  // Archive document
+  archiveDocument: async (id) => {
+    const response = await apiClient.patch(`/documents/${id}/`, { status: 'archived' });
+    return response.data;
+  },
 };
 
 // Tags API

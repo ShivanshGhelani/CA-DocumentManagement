@@ -11,6 +11,8 @@ export default function TrashPage() {
   
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [documentToRestore, setDocumentToRestore] = useState(null);
+  const [permanentDeleteModalOpen, setPermanentDeleteModalOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
 
   // Fetch deleted documents
   const { data: deletedDocuments, isLoading: documentsLoading, error } = useQuery({
@@ -31,6 +33,20 @@ export default function TrashPage() {
     onError: (error) => {
       console.error('Restore error:', error);
       alert('Failed to restore document. Please try again.');
+    },
+  });
+
+  // Permanent delete mutation
+  const permanentDeleteMutation = useMutation({
+    mutationFn: documentsAPI.deletePermanently, // You need to implement this in your API
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deletedDocuments'] });
+      setPermanentDeleteModalOpen(false);
+      setDocumentToDelete(null);
+    },
+    onError: (error) => {
+      console.error('Permanent delete error:', error);
+      alert('Failed to permanently delete document. Please try again.');
     },
   });
 
@@ -66,6 +82,17 @@ export default function TrashPage() {
   const confirmRestore = () => {
     if (documentToRestore) {
       restoreMutation.mutate(documentToRestore.id);
+    }
+  };
+
+  const handlePermanentDeleteClick = (document) => {
+    setDocumentToDelete(document);
+    setPermanentDeleteModalOpen(true);
+  };
+
+  const confirmPermanentDelete = () => {
+    if (documentToDelete) {
+      permanentDeleteMutation.mutate(documentToDelete.id);
     }
   };
 
@@ -190,6 +217,17 @@ export default function TrashPage() {
                           </svg>
                           {restoreMutation.isPending ? 'Restoring...' : 'Restore'}
                         </button>
+                        <button
+                          onClick={() => handlePermanentDeleteClick(doc)}
+                          disabled={permanentDeleteMutation.isPending}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-400 transition-colors ml-2"
+                          title="Delete permanently"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          {permanentDeleteMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -253,6 +291,42 @@ export default function TrashPage() {
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-400"
                 >
                   {restoreMutation.isPending ? 'Restoring...' : 'Restore'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Confirmation Modal */}
+      {permanentDeleteModalOpen && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900">Delete Permanently</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to permanently delete "{documentToDelete?.title}"? This action cannot be undone and will remove the document and all associated tags/files from the system.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-3 mt-4">
+                <button
+                  onClick={() => setPermanentDeleteModalOpen(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmPermanentDelete}
+                  disabled={permanentDeleteMutation.isPending}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-400"
+                >
+                  {permanentDeleteMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
                 </button>
               </div>
             </div>

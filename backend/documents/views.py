@@ -514,3 +514,55 @@ def tag_suggestions(request):
     suggestions.sort(key=lambda x: (x["key"], x["value"]))
 
     return Response(suggestions[:20])  # Limit to 20 suggestions
+
+
+@api_view(["DELETE"])
+@permission_classes([permissions.IsAuthenticated])
+def permanent_delete_document(request, pk):
+    """Permanently delete a document, its file from S3, and its tags if unused."""
+    try:
+        user = request.user
+        document = Document.objects.all_with_deleted().get(pk=pk)
+        if document.created_by != user:
+            return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Delete file from S3 if exists
+        if document.file:
+            s3_client = boto3.client(
+                "s3",
+                region_name=settings.AWS_S3_REGION_NAME,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            )
+            try:
+                s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=document.file.name)
+            except Exception as e:
+                # Log but don't block deletion if file is missing
+                print(f"S3 file delete error: {e}")
+
+        # Collect tags to check for orphaned tags
+        tag_ids = list(document.tags.values_list('id', flat=True))
+
+        # Delete the document (this will also remove M2M relations)
+        document.delete()
+
+        # Delete tags that are not used by any other documents
+        for tag_id in tag_ids:
+            tag = Tag.objects.filter(id=tag_id).first()
+            if tag and tag.documents.count() == 0:
+                tag.delete()
+
+        # Log audit
+        AuditLog.log_activity(
+            user=user,
+            action="permanent_delete",
+            resource_type="document",
+            resource_id=str(pk),
+            resource_name=getattr(document, 'title', str(pk)),
+            request=request,
+        )
+        return Response({"message": "Document permanently deleted."}, status=status.HTTP_204_NO_CONTENT)
+    except Document.DoesNotExist:
+        return Response({"error": "Document not found."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
