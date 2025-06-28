@@ -24,7 +24,8 @@ const ArchivePage = () => {
   const handleUnarchive = async (doc) => {
     setUnarchivingId(doc.id);
     try {
-      await documentsAPI.archiveDocument(doc.id, 'published');
+      // Unarchive by setting status to draft
+      await documentsAPI.archiveDocument(doc.id, 'draft');
       setDocuments(prev => prev.filter(d => d.id !== doc.id));
     } catch {
       alert('Failed to unarchive document.');

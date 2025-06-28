@@ -254,21 +254,13 @@ class DocumentCreateView(generics.CreateAPIView):
         )
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([permissions.IsAuthenticated])
 def document_download(request, pk):
     """Download document file"""
     try:
         user = request.user
         document = Document.objects.get(pk=pk)
-
-        # Check access permissions
-        if document.created_by != user:
-            access = document.access_permissions.filter(user=user).first()
-            if not access:
-                return Response(
-                    {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
-                )
 
         # Log download
         AuditLog.log_activity(

@@ -207,9 +207,13 @@ export const documentsAPI = {
     return response.data;
   },
 
-  // Archive document
-  archiveDocument: async (id) => {
-    const response = await apiClient.patch(`/documents/${id}/`, { status: 'archived' });
+  // Archive or update document status
+  archiveDocument: async (id, status = 'archived') => {
+    const response = await apiClient.patch(
+      `/documents/${id}/`,
+      { status },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
     return response.data;
   },
 };
