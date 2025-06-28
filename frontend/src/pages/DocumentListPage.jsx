@@ -111,12 +111,21 @@ export default function DocumentListPage() {
   //   return apiFilters;
   // };
 
-  // Fetch available tags for filter
-  const { data: availableTags } = useQuery({
-    queryKey: ['tags'],
-    queryFn: tagsAPI.getTags,
+  // Derive available tags from active documents cache (excludes trashed docs)
+  let tagsArray = [];
+  try {
+    const allDocs = JSON.parse(localStorage.getItem('allDocuments') || '[]');
+    const tagMap = new Map();
+    allDocs.forEach((doc) => {
+      (doc.tags || []).forEach((tag) => {
+        if (!tagMap.has(tag.id)) tagMap.set(tag.id, tag);
+      });
+    });
+    tagsArray = Array.from(tagMap.values());
+  } catch (e) {
+    tagsArray = [];
+  }
 
-  });
   // console.log('Available Tags:', availableTags);
   // console.log('Current User:', currentUser);
 
@@ -243,8 +252,7 @@ export default function DocumentListPage() {
   // Modified to include all users except current user, regardless of whether they've created documents
   const usersDropdown = (usersData?.results || []).filter(u => !currentUser || String(u.id) !== String(currentUser.id));
 
-  // Ensure availableTags is an array
-  const tagsArray = Array.isArray(availableTags) ? availableTags : (availableTags?.results || []);
+  // tagsArray now contains unique tags from non-deleted documents
 
   // Use users from backend only for the dropdown, excluding the current user
   // const usersDropdown = (usersData?.results || []).filter(u => !currentUser || u.id !== currentUser.id);

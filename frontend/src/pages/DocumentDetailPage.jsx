@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/axios';
 import mammoth from 'mammoth';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -204,6 +205,7 @@ const FileTypeSVG = ({ fileType, className = "w-8 h-8" }) => {
 export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showVersions, setShowVersions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentContent, setDocumentContent] = useState(null);
@@ -280,7 +282,11 @@ export default function DocumentDetailPage() {
   });
   const deleteMutation = useMutation({
     mutationFn: deleteDocument,
-    onSuccess: () => navigate('/documents')
+    onSuccess: () => {
+      // Refresh tags list to remove tags of deleted document
+      queryClient.invalidateQueries(['tags']);
+      navigate('/documents');
+    }
   });
   const rollbackMutation = useMutation({
     mutationFn: rollbackDocument,
