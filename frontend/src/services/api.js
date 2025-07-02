@@ -201,6 +201,15 @@ export const documentsAPI = {
     return response.data;
   },
 
+  // Rollback document to a previous version
+  rollbackDocument: async (id, versionId, reason = "") => {
+    const response = await apiClient.post(`/documents/${id}/rollback/`, {
+      version_id: versionId,
+      reason,
+    });
+    return response.data;
+  },
+
   // Permanently delete document
   deletePermanently: async (id) => {
     const response = await apiClient.delete(`/documents/${id}/permanent/`);

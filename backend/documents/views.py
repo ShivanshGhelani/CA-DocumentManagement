@@ -12,12 +12,15 @@ from .serializers import (
     TagSerializer,
     DocumentVersionSerializer,
     DocumentAccessSerializer,
+    DocumentRollbackSerializer,
 )
 from .filters import DocumentFilter
 from audit.models import AuditLog
 import json
 import boto3
 from django.conf import settings
+from s3_file_manager import update_s3_object_tags
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 class TagListCreateView(generics.ListCreateAPIView):
@@ -42,7 +45,7 @@ class TagListCreateView(generics.ListCreateAPIView):
             action="create",
             resource_type="tag",
             resource_id=tag.id,
-            resource_name=tag.name,
+            resource_name=tag.display_name,
             content_object=tag,
             request=self.request,
         )
@@ -66,7 +69,7 @@ class TagDetailView(generics.RetrieveUpdateDestroyAPIView):
             action="update",
             resource_type="tag",
             resource_id=tag.id,
-            resource_name=tag.name,
+            resource_name=tag.display_name,
             content_object=tag,
             request=self.request,
         )
@@ -78,7 +81,7 @@ class TagDetailView(generics.RetrieveUpdateDestroyAPIView):
             action="delete",
             resource_type="tag",
             resource_id=instance.id,
-            resource_name=instance.name,
+            resource_name=instance.display_name,
             request=self.request,
         )
 
@@ -178,9 +181,13 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
         user = self.request.user
         if instance.created_by != user:
             from rest_framework.exceptions import PermissionDenied
-
             raise PermissionDenied("You do not have permission to edit this document.")
         document = serializer.save()
+        # --- S3 tag sync ---
+        tags_dict = {tag.key: tag.value for tag in document.tags.all()}
+        if document.file:
+            update_s3_object_tags(document.file.name, tags_dict)
+        # --- end S3 tag sync ---
         AuditLog.log_activity(
             user=user,
             action="update",
@@ -558,3 +565,103 @@ def permanent_delete_document(request, pk):
         return Response({"error": "Document not found."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def document_rollback(request, pk):
+    """Rollback a document to a previous version, including metadata and tags."""
+    try:
+        document = Document.objects.get(pk=pk)
+    except Document.DoesNotExist:
+        return Response({"detail": "Document not found."}, status=404)
+
+    serializer = DocumentRollbackSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    version_id = serializer.validated_data["version_id"]
+    reason = serializer.validated_data.get("reason", "")
+
+    try:
+        version = DocumentVersion.objects.get(id=version_id, document=document)
+    except DocumentVersion.DoesNotExist:
+        return Response({"detail": "Version not found."}, status=404)
+
+    # Save current state as a new version before rollback
+    DocumentVersion.objects.create(
+        document=document,
+        version_number=document.version,
+        file=document.file,
+        file_size=document.file_size or 0,
+        changes_description=f"Backup before rollback (v{document.version})",
+        created_by=request.user,
+    )
+
+    # Rollback file
+    document.file = version.file
+    document.file_size = version.file_size
+    document.version += 1
+
+    # Optionally, rollback content, title, description, status, tags, etc. (customize as needed)
+    # For now, just rollback file and tags
+
+    # Rollback tags: (Assume tags at rollback time are same as now, or customize if you store tag history)
+    # If you want to rollback tags, you need to store them per version. For now, keep as is.
+
+    document.save()
+
+    # Update S3 object tags to match current document tags
+    tags_dict = {tag.key: tag.value for tag in document.tags.all()}
+    if document.file:
+        update_s3_object_tags(document.file.name, tags_dict)
+
+    # Log rollback
+    AuditLog.log_activity(
+        user=request.user,
+        action="rollback",
+        resource_type="document",
+        resource_id=str(document.id),
+        resource_name=document.title,
+        details={"version_id": str(version_id), "reason": reason},
+        content_object=document,
+        request=request,
+    )
+
+    detail_serializer = DocumentDetailSerializer(document, context={"request": request})
+    return Response(detail_serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def upload_document_version(request, pk):
+    """Upload a new version of a document (file)."""
+    from s3_file_manager import update_s3_object_tags
+    try:
+        document = Document.objects.get(pk=pk)
+    except Document.DoesNotExist:
+        return Response({"detail": "Document not found."}, status=404)
+    if document.created_by != request.user:
+        return Response({"detail": "You do not have permission to upload a new version for this document."}, status=403)
+    if 'file' not in request.FILES:
+        return Response({"detail": "No file uploaded."}, status=400)
+    new_file = request.FILES['file']
+    # Save current file as a version
+    DocumentVersion.objects.create(
+        document=document,
+        version_number=document.version,
+        file=document.file,
+        file_size=document.file_size or 0,
+        changes_description=f"Version {document.version} backup before upload",
+        created_by=request.user,
+    )
+    # Update document with new file
+    document.file = new_file
+    document.file_size = new_file.size
+    document.version += 1
+    document.save()
+    # Sync S3 tags
+    tags_dict = {tag.key: tag.value for tag in document.tags.all()}
+    if document.file:
+        update_s3_object_tags(document.file.name, tags_dict)
+    # Return updated document detail
+    serializer = DocumentDetailSerializer(document, context={"request": request})
+    return Response(serializer.data)

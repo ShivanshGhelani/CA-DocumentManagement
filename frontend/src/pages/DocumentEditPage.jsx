@@ -5,7 +5,7 @@ import * as Yup from 'yup';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import apiClient from '../services/axios';
-// import { toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 const DocumentEditSchema = Yup.object().shape({
   title: Yup.string()
@@ -15,6 +15,14 @@ const DocumentEditSchema = Yup.object().shape({
     .max(500, 'Description must be 500 characters or less'),
   status: Yup.string().oneOf(['draft', 'published'], 'Invalid status'),
 });
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 export default function DocumentEditPage() {
   const { id } = useParams();
@@ -30,12 +38,15 @@ export default function DocumentEditPage() {
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [content, setContent] = useState('');
   const [status, setStatus] = useState('draft');
   const [tags, setTags] = useState([]);
   const [tagKeyInput, setTagKeyInput] = useState('');
   const [tagValueInput, setTagValueInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = React.useRef(null);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [filteredTagSuggestions, setFilteredTagSuggestions] = useState([]);
 
   // Fetch document data
   const { data: document, isLoading: documentLoading, error: documentError } = useQuery({
@@ -44,10 +55,14 @@ export default function DocumentEditPage() {
   });
 
   // Fetch available tags
-  const { data: availableTags } = useQuery({
+  const { data: availableTagsRaw } = useQuery({
     queryKey: ['tags'],
     queryFn: tagsAPI.getTags,
   });
+  // Always use an array for availableTags
+  const availableTags = Array.isArray(availableTagsRaw)
+    ? availableTagsRaw
+    : (availableTagsRaw?.results || []);
 
   // Fetch document versions
   const { data: versions } = useQuery({
@@ -69,6 +84,7 @@ export default function DocumentEditPage() {
     if (document) {
       setTitle(document.title || '');
       setDescription(document.description || '');
+      setContent(document.content || '');
       setStatus(document.status || 'draft');
       setTags(document.tags ? document.tags.map(tag => ({ key: tag.key, value: tag.value })) : []);
       setSelectedTags(document.tags ? document.tags.map(tag => tag.id) : []);
@@ -185,13 +201,45 @@ export default function DocumentEditPage() {
     }
   };
   
+  // Update handleAddTag to prevent duplicates and use existing tags if available
   const handleAddTag = () => {
-    const key = tagKeyInput.trim();
-    const value = tagValueInput.trim();
-    if (key && value && !tags.some(tag => tag.key === key)) {
+    try {
+      const safeAvailableTags = Array.isArray(availableTags) ? availableTags : [];
+      if (!Array.isArray(availableTags)) {
+        toast.error('Tags are still loading. Please try again in a moment.');
+        return;
+      }
+      console.log('handleAddTag called', { tagKeyInput, tagValueInput, availableTags, tags });
+      const key = tagKeyInput.trim();
+      const value = tagValueInput.trim();
+      if (!key || !value) {
+        toast.error('Please enter both a tag key and value.');
+        return;
+      }
+      // Check if tag already exists in availableTags or tags
+      const existingTag = safeAvailableTags.find(
+        t => t.key === key && t.value === value
+      ) || tags.find(t => t.key === key && t.value === value);
+      if (existingTag) {
+        // If already in tags, show toast
+        if (tags.some(t => t.key === key && t.value === value)) {
+          toast.error('Tag already added.');
+          return;
+        }
+        // Add existing tag to tags state
+        setTags([...tags, existingTag]);
+        setTagKeyInput('');
+        setTagValueInput('');
+        toast.success('Tag added!');
+        return;
+      }
+      // Add new tag (without id)
       setTags([...tags, { key, value }]);
       setTagKeyInput('');
       setTagValueInput('');
+      toast.success('Tag added!');
+    } catch (err) {
+      toast.error('Unexpected error adding tag: ' + (err?.message || err));
     }
   };
 
@@ -202,23 +250,104 @@ export default function DocumentEditPage() {
   const handleTagKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddTag();
+      if (typeof handleAddTag === 'function') {
+        handleAddTag();
+      } else {
+        toast.error('Add Tag function not available.');
+      }
     }
   };
 
-  const handleSaveMetadata = () => {
+  const handleSaveMetadata = async () => {
     setIsSaving(true);
-    
-    // Simulate saving
-    setTimeout(() => {
+    try {
+      // 1. For tags without id, check if they exist in availableTags (by key/value)
+      const tagsWithIds = tags.map(tag => {
+        if (tag.id) return tag;
+        const found = (availableTags || []).find(t => t.key === tag.key && t.value === tag.value);
+        return found ? found : tag;
+      });
+      // 2. Create only tags that still have no id
+      const newTagsToCreate = tagsWithIds.filter(tag => !tag.id);
+      const createdTagObjs = [];
+      for (const tag of newTagsToCreate) {
+        try {
+          const created = await tagsAPI.createTag({ key: tag.key, value: tag.value });
+          createdTagObjs.push(created);
+        } catch (err) {
+          toast.error(`Failed to create tag: ${tag.key}`);
+        }
+      }
+      // 3. Merge all tags (existing, found, and newly created)
+      const allTags = [
+        ...tagsWithIds.filter(tag => tag.id),
+        ...createdTagObjs,
+      ];
+      // 4. Remove duplicates (by id or key/value)
+      const uniqueTags = [];
+      const seen = new Set();
+      for (const tag of allTags) {
+        const tagKey = tag.id ? `id:${tag.id}` : `kv:${tag.key}:${tag.value}`;
+        if (!seen.has(tagKey)) {
+          uniqueTags.push(tag);
+          seen.add(tagKey);
+        }
+      }
+      setTags(uniqueTags); // update state for UI
+      // 5. Collect all tag IDs
+      const allTagIds = uniqueTags.map(tag => tag.id).filter(Boolean);
+      // 6. Update document with all tag IDs
+      await documentsAPI.updateDocument(id, {
+        title,
+        description,
+        content,
+        status,
+        tag_ids: allTagIds,
+      });
       setIsSaving(false);
       toast.success('Document metadata updated successfully!');
-    }, 1500);
+      queryClient.invalidateQueries({ queryKey: ['document', id] });
+    } catch (err) {
+      setIsSaving(false);
+      toast.error('Failed to update document metadata.');
+    }
   };
   
   // Trigger file input click
   const triggerFileInput = () => {
     fileInputRef.current.click();
+  };
+
+  // Filter tag suggestions as user types
+  useEffect(() => {
+    if (tagKeyInput.trim().length === 0) {
+      setFilteredTagSuggestions([]);
+      setShowTagSuggestions(false);
+      return;
+    }
+    const input = tagKeyInput.trim().toLowerCase();
+    const suggestions = availableTags.filter(
+      t =>
+        (t.key.toLowerCase().includes(input) || t.value.toLowerCase().includes(input)) &&
+        !tags.some(tag => tag.key === t.key && tag.value === t.value)
+    );
+    setFilteredTagSuggestions(suggestions);
+    setShowTagSuggestions(suggestions.length > 0);
+  }, [tagKeyInput, availableTags, tags]);
+
+  // When a suggestion is clicked
+  const handleTagSuggestionClick = (tag) => {
+    // If already in tags, do nothing
+    if (tags.some(t => t.key === tag.key && t.value === tag.value)) {
+      toast.error('Tag already added.');
+      setShowTagSuggestions(false);
+      return;
+    }
+    setTags([...tags, tag]);
+    setTagKeyInput('');
+    setTagValueInput('');
+    setShowTagSuggestions(false);
+    toast.success('Tag added!');
   };
 
   if (documentLoading) {
@@ -379,6 +508,23 @@ export default function DocumentEditPage() {
                   ></textarea>
                 </div>
 
+                <div className="space-y-1">
+                  <label htmlFor="document-content" className="flex text-sm font-medium text-slate-700 items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                    Content
+                  </label>
+                  <textarea
+                    id="document-content"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    rows="6"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
+                    placeholder="Edit document content..."
+                  ></textarea>
+                </div>
+
                 <div className="space-y-2">
                   <label className="flex text-sm font-medium text-slate-700 items-center gap-1">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,20 +557,45 @@ export default function DocumentEditPage() {
                       type="text"
                       value={tagKeyInput}
                       onChange={e => setTagKeyInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      onFocus={() => setShowTagSuggestions(filteredTagSuggestions.length > 0)}
                       className="flex-1 px-3 py-2 w-20 lg:w-20 sm:w-10 md:w-20 border border-slate-300 rounded-l-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
                       placeholder="Tag key..."
+                      autoComplete="off"
                     />
+                    {/* Tag suggestions dropdown */}
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div className="absolute z-10 mt-10 w-48 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {filteredTagSuggestions.map((tag, idx) => (
+                          <div
+                            key={tag.id || tag.key + tag.value + idx}
+                            className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm text-slate-700 flex justify-between items-center"
+                            onClick={() => handleTagSuggestionClick(tag)}
+                          >
+                            <span><b>{tag.key}</b>{tag.value ? `: ${tag.value}` : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <input
                       type="text"
                       value={tagValueInput}
                       onChange={e => setTagValueInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
                       className="flex-1 px-3 py-2 w-20 border-t border-b border-slate-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
                       placeholder="Tag value..."
                     />
                     <button
                       type="button"
-                      onClick={handleAddTag}
-                      className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 border-l-0 rounded-r-md hover:bg-slate-200 transition-colors font-medium flex items-center gap-1"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (typeof handleAddTag === 'function') {
+                          handleAddTag();
+                        } else {
+                          toast.error('Add Tag function not available.');
+                        }
+                      }}
+                      className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 border-l-0 rounded-r-md hover:bg-slate-200 transition-colors font-medium flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -629,6 +800,21 @@ export default function DocumentEditPage() {
                               {version.created_by?.first_name?.[0] || 'U'}
                             </div>
                             <span className="text-slate-600">{version.created_by?.first_name} {version.created_by?.last_name}</span>
+                            <button
+                              className="ml-auto px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs font-medium"
+                              onClick={async () => {
+                                try {
+                                  await documentsAPI.rollbackDocument(id, version.id);
+                                  toast.success('Rolled back to selected version!');
+                                  queryClient.invalidateQueries({ queryKey: ['document', id] });
+                                  queryClient.invalidateQueries({ queryKey: ['document-versions', id] });
+                                } catch (err) {
+                                  toast.error('Failed to rollback version.');
+                                }
+                              }}
+                            >
+                              Rollback
+                            </button>
                           </div>
                         </div>
                       ))}

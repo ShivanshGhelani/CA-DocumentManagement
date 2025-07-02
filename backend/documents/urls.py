@@ -15,7 +15,9 @@ urlpatterns = [    # Tags
     path('documents/<uuid:pk>/share/', views.document_share, name='document-share'),
     path('documents/<uuid:pk>/restore/', views.restore_document, name='document-restore'),
     path('documents/<uuid:pk>/permanent/', views.permanent_delete_document, name='document-permanent-delete'),
+    path('documents/<uuid:pk>/upload-version/', views.upload_document_version, name='document-upload-version'),
     
     # Document Versions
     path('documents/<uuid:document_id>/versions/', views.DocumentVersionListView.as_view(), name='document-versions'),
+    path('documents/<uuid:pk>/rollback/', views.document_rollback, name='document-rollback'),
 ]

@@ -33,21 +33,68 @@ export default function DocumentCreatePage() {
   const { isAuthenticated, isLoading } = useAuth();
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState({ key: '', value: '' });
-  const [tagSuggestions, setTagSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [filteredTagSuggestions, setFilteredTagSuggestions] = useState([]);
   const tagInputRef = useRef(null);
 
-  // Fetch tag suggestions with debouncing
-  const { refetch: fetchSuggestions } = useQuery({
-    queryKey: ['tagSuggestions', tagInput.key],
-    queryFn: () => tagsAPI.getTagSuggestions(tagInput.key),
-    enabled: false,
-    onSuccess: (data) => {
-      setTagSuggestions(data);
-      setShowSuggestions(true);
-    }
+  // Fetch all tags for suggestions
+  const { data: availableTagsRaw } = useQuery({
+    queryKey: ['tags'],
+    queryFn: tagsAPI.getTags,
   });
-  
+  const availableTags = Array.isArray(availableTagsRaw)
+    ? availableTagsRaw
+    : (availableTagsRaw?.results || []);
+
+  // Filter tag suggestions as user types
+  React.useEffect(() => {
+    if (tagInput.key.trim().length === 0) {
+      setFilteredTagSuggestions([]);
+      setShowTagSuggestions(false);
+      return;
+    }
+    const input = tagInput.key.trim().toLowerCase();
+    const suggestions = availableTags.filter(
+      t =>
+        (t.key.toLowerCase().includes(input) || t.value.toLowerCase().includes(input)) &&
+        !tags.some(tag => tag.key === t.key && tag.value === t.value)
+    );
+    setFilteredTagSuggestions(suggestions);
+    setShowTagSuggestions(suggestions.length > 0);
+  }, [tagInput.key, availableTags, tags]);
+
+  // When a suggestion is clicked
+  const handleTagSuggestionClick = (tag) => {
+    if (tags.some(t => t.key === tag.key && t.value === tag.value)) {
+      setShowTagSuggestions(false);
+      return;
+    }
+    setTags([...tags, tag]);
+    setTagInput({ key: '', value: '' });
+    setShowTagSuggestions(false);
+  };
+
+  // Add tag (manual entry)
+  const addTag = () => {
+    if (!tagInput.key.trim()) return;
+    const isDuplicate = tags.some(tag => 
+      tag.key === tagInput.key.trim() && tag.value === tagInput.value.trim()
+    );
+    if (!isDuplicate) {
+      setTags(prev => [...prev, { 
+        key: tagInput.key.trim(), 
+        value: tagInput.value.trim() 
+      }]);
+    }
+    setTagInput({ key: '', value: '' });
+    setShowTagSuggestions(false);
+  };
+
+  // Fix: Remove tag by index
+  const removeTag = (index) => {
+    setTags(tags => tags.filter((_, i) => i !== index));
+  };
+
   const mutation = useMutation({ 
     mutationFn: documentsAPI.createDocument,
     onSuccess: () => {
@@ -82,41 +129,6 @@ export default function DocumentCreatePage() {
   }
 
   const handleTagInputChange = (field, value) => {    setTagInput(prev => ({ ...prev, [field]: value }));
-    
-    // Fetch suggestions when typing in key field
-    if (field === 'key' && value.trim()) {
-      setTimeout(() => fetchSuggestions(), 300);
-    } else if (field === 'key' && !value.trim()) {
-      setShowSuggestions(false);
-    }
-  };
-
-  const selectSuggestion = (suggestion) => {
-    setTagInput(suggestion);
-    setShowSuggestions(false);
-  };
-
-  const addTag = () => {
-    if (!tagInput.key.trim()) return;
-    
-    // Check for duplicates
-    const isDuplicate = tags.some(tag => 
-      tag.key === tagInput.key.trim() && tag.value === tagInput.value.trim()
-    );
-    
-    if (!isDuplicate) {
-      setTags(prev => [...prev, { 
-        key: tagInput.key.trim(), 
-        value: tagInput.value.trim() 
-      }]);
-    }
-    
-    setTagInput({ key: '', value: '' });
-    setShowSuggestions(false);
-  };
-
-  const removeTag = (index) => {
-    setTags(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleKeyPress = (e) => {
@@ -239,27 +251,24 @@ export default function DocumentCreatePage() {
                             type="text"
                             placeholder="Tag key (required)"
                             value={tagInput.key}
-                            onChange={(e) => handleTagInputChange('key', e.target.value)}
+                            onChange={e => handleTagInputChange('key', e.target.value)}
                             onKeyPress={handleKeyPress}
-                            onFocus={() => tagInput.key.trim() && setShowSuggestions(true)}
-                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            onFocus={() => setShowTagSuggestions(filteredTagSuggestions.length > 0)}
+                            onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             maxLength={50}
                           />
-                          
                           {/* Suggestions Dropdown */}
-                          {showSuggestions && tagSuggestions.length > 0 && (
+                          {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                              {tagSuggestions.map((suggestion, index) => (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  onClick={() => selectSuggestion(suggestion)}
-                                  className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                              {filteredTagSuggestions.map((tag, idx) => (
+                                <div
+                                  key={tag.id || tag.key + tag.value + idx}
+                                  className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm text-slate-700 flex justify-between items-center"
+                                  onMouseDown={() => handleTagSuggestionClick(tag)}
                                 >
-                                  <span className="font-medium">{suggestion.key}</span>
-                                  {suggestion.value && <span className="text-gray-600">: {suggestion.value}</span>}
-                                </button>
+                                  <span><b>{tag.key}</b>{tag.value ? `: ${tag.value}` : ''}</span>
+                                </div>
                               ))}
                             </div>
                           )}

@@ -300,3 +300,8 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 document.tags.add(tag)
         
         return document
+
+
+class DocumentRollbackSerializer(serializers.Serializer):
+    version_id = serializers.UUIDField()
+    reason = serializers.CharField(required=False, allow_blank=True)

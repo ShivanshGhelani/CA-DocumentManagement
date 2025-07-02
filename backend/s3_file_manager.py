@@ -1,5 +1,7 @@
 import os
 import django
+import boto3
+from django.conf import settings
 
 # Set up Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')  # Change if needed
@@ -91,6 +93,30 @@ def delete_folder():
         print("✅ All files in the folder have been deleted.")
     except Exception as e:
         print("❌ Error deleting folder contents:", e)
+
+
+def update_s3_object_tags(s3_key, tags_dict):
+    """
+    Update tags for an S3 object.
+    s3_key: The S3 object key (path in the bucket)
+    tags_dict: Dictionary of tags to set (key-value pairs)
+    """
+    s3 = boto3.client(
+        's3',
+        aws_access_key_id=getattr(settings, 'AWS_ACCESS_KEY_ID', None),
+        aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
+        region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
+    )
+    bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+    if not bucket_name:
+        raise Exception('AWS_STORAGE_BUCKET_NAME not set in settings')
+    tag_set = [{'Key': str(k), 'Value': str(v)} for k, v in tags_dict.items()]
+    s3.put_object_tagging(
+        Bucket=bucket_name,
+        Key=s3_key,
+        Tagging={'TagSet': tag_set}
+    )
+    return True
 
 
 def main():

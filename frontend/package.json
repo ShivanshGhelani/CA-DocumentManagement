@@ -19,6 +19,7 @@
     "pdfjs-dist": "^5.3.31",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hot-toast": "^2.5.2",
     "react-image-crop": "^11.0.10",
     "react-pdf": "^10.0.1",
     "react-router": "^7.5.3",
