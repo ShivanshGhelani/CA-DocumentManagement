@@ -19,6 +19,15 @@ def document_upload_path(instance, filename):
     
     return f"documents/{username}/{original_name}/{unique_filename}"
 
+# New: versioned upload path for DocumentVersion
+
+def document_version_upload_path(instance, filename):
+    """Generate S3 path for document versions: documents/{username}/{document_id}/all_versions/{version_id}/{filename}"""
+    username = str(instance.created_by.username).replace(" ", "_")
+    document_id = str(instance.document.id)
+    version_id = str(instance.id or uuid.uuid4())
+    return f"documents/{username}/{document_id}/all_versions/{version_id}/{filename}"
+
 
 
 class DocumentManager(models.Manager):
@@ -152,9 +161,10 @@ class DocumentVersion(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='versions')
     version_number = models.PositiveIntegerField()
-    file = models.FileField(upload_to=document_upload_path)
+    file = models.FileField(upload_to=document_version_upload_path)
     file_size = models.PositiveIntegerField()
     changes_description = models.TextField(blank=True)
+    reason = models.CharField(max_length=255, blank=True, help_text="Reason for uploading this version")
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -165,6 +175,8 @@ class DocumentVersion(models.Model):
     def save(self, *args, **kwargs):
         if self.file:
             self.file_size = self.file.size
+        if self.reason and not self.changes_description:
+            self.changes_description = self.reason
         super().save(*args, **kwargs)
     
     def __str__(self):

@@ -47,6 +47,8 @@ export default function DocumentEditPage() {
   const fileInputRef = React.useRef(null);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [filteredTagSuggestions, setFilteredTagSuggestions] = useState([]);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [uploadReason, setUploadReason] = useState('');
 
   // Fetch document data
   const { data: document, isLoading: documentLoading, error: documentError } = useQuery({
@@ -145,34 +147,36 @@ export default function DocumentEditPage() {
   };
 
   
-  // Handle file upload
+  // Modified handleFileUpload to show modal for reason
   const handleFileUpload = async () => {
     if (!selectedFile) {
       setUploadError('Please select a file to upload');
       return;
     }
-
     // Check file size (10MB limit)
     if (selectedFile.size > 10 * 1024 * 1024) {
       setUploadError('File size exceeds 10MB limit');
       return;
     }
-
     // Check file type
     const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'text/markdown'];
     if (!allowedTypes.includes(selectedFile.type)) {
       setUploadError('File type not supported. Please upload PDF, DOC, DOCX, TXT, or MD files.');
       return;
     }
+    // Show reason modal
+    setShowReasonModal(true);
+  };
 
+  // Confirm upload with reason
+  const confirmFileUpload = async () => {
     setIsUploading(true);
     setUploadProgress(0);
     setUploadError(null);
-
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-
+      formData.append('reason', uploadReason);
       await apiClient.post(`/documents/${id}/upload-version/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -182,25 +186,27 @@ export default function DocumentEditPage() {
           setUploadProgress(percentCompleted);
         },
       });
-
-      // Reset state and refresh document data
       setSelectedFile(null);
       setUploadProgress(0);
       setIsUploading(false);
-
-      // Refresh document data
+      setShowReasonModal(false);
+      setUploadReason('');
       queryClient.invalidateQueries({ queryKey: ['document', id] });
       queryClient.invalidateQueries({ queryKey: ['document-versions', id] });
-
-      // Show version history after successful upload
       setShowVersionHistory(true);
-
     } catch (error) {
       setUploadError(error.response?.data?.message || 'Failed to upload file. Please try again.');
       setIsUploading(false);
+      setShowReasonModal(false);
     }
   };
-  
+
+  // Cancel upload modal
+  const cancelFileUpload = () => {
+    setShowReasonModal(false);
+    setUploadReason('');
+  };
+
   // Update handleAddTag to prevent duplicates and use existing tags if available
   const handleAddTag = () => {
     try {
@@ -391,6 +397,38 @@ export default function DocumentEditPage() {
 
   return (
     <div className="px-4 pt-8">
+      {/* Reason Modal */}
+      {showReasonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-2">Reason for New Version</h2>
+            <textarea
+              className="w-full border border-slate-300 rounded-md p-2 mb-4"
+              rows={3}
+              value={uploadReason}
+              onChange={e => setUploadReason(e.target.value)}
+              placeholder="Describe the reason for uploading this new version..."
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded hover:bg-slate-200"
+                onClick={cancelFileUpload}
+                disabled={isUploading}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={confirmFileUpload}
+                disabled={isUploading || !uploadReason.trim()}
+              >
+                {isUploading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="bg-white/80 backdrop-blur-sm shadow-sm rounded-xl  p-6 mb-8">
@@ -789,6 +827,9 @@ export default function DocumentEditPage() {
                               <div>
                                 <p className="font-medium text-slate-900">Version {version.version_number}</p>
                                 <p className="text-xs text-slate-500">{new Date(version.created_at).toLocaleString()}</p>
+                                {version.reason && (
+                                  <p className="text-xs text-slate-700 mt-1"><span className="font-semibold">Reason:</span> {version.reason}</p>
+                                )}
                               </div>
                             </div>
                             {version.is_current && (
@@ -842,5 +883,6 @@ export default function DocumentEditPage() {
           {/* Upload Section moved to right column */}
         </div>
       </div>
-  );  
+    
+  );
 }

@@ -111,12 +111,28 @@ def update_s3_object_tags(s3_key, tags_dict):
     if not bucket_name:
         raise Exception('AWS_STORAGE_BUCKET_NAME not set in settings')
     tag_set = [{'Key': str(k), 'Value': str(v)} for k, v in tags_dict.items()]
-    s3.put_object_tagging(
-        Bucket=bucket_name,
-        Key=s3_key,
-        Tagging={'TagSet': tag_set}
-    )
-    return True
+    print(f"[S3 TAG SYNC] Attempting to update tags for S3 key: {s3_key} with tags: {tags_dict}")
+    # Check if object exists before tagging
+    try:
+        s3.head_object(Bucket=bucket_name, Key=s3_key)
+    except s3.exceptions.NoSuchKey:
+        print(f"[S3 TAG SYNC] ERROR: S3 object does not exist: {s3_key}")
+        return False
+    except Exception as e:
+        print(f"[S3 TAG SYNC] ERROR: Unexpected error checking S3 object: {e}")
+        return False
+    # Try to update tags
+    try:
+        s3.put_object_tagging(
+            Bucket=bucket_name,
+            Key=s3_key,
+            Tagging={'TagSet': tag_set}
+        )
+        print(f"[S3 TAG SYNC] Tags updated successfully for {s3_key}")
+        return True
+    except Exception as e:
+        print(f"[S3 TAG SYNC] ERROR: Failed to update tags for {s3_key}: {e}")
+        return False
 
 
 def main():

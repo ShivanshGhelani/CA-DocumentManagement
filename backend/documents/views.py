@@ -228,26 +228,12 @@ class DocumentCreateView(generics.CreateAPIView):
         if isinstance(tags_data, str):
             tags_data = json.loads(tags_data)
 
-        if document.file and tags_data:
-            # Prepare TagSet for S3
-            tag_set = [
-                {"Key": tag["key"], "Value": tag.get("value", "")} for tag in tags_data
-            ]
-
-            # S3 client
-            s3_client = boto3.client(
-                "s3",
-                region_name=settings.AWS_S3_REGION_NAME,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            )
-
-            # document.file.name is the S3 key path (e.g. "uploads/my-file.pdf")
-            s3_client.put_object_tagging(
-                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                Key=document.file.name,
-                Tagging={"TagSet": tag_set},
-            )
+        # Always sync S3 tags using update_s3_object_tags
+        tags_dict = {}
+        if tags_data:
+            tags_dict = {tag["key"]: tag.get("value", "") for tag in tags_data}
+        if document.file:
+            update_s3_object_tags(document.file.name, tags_dict)
 
         # Audit log
         AuditLog.log_activity(
@@ -644,6 +630,7 @@ def upload_document_version(request, pk):
     if 'file' not in request.FILES:
         return Response({"detail": "No file uploaded."}, status=400)
     new_file = request.FILES['file']
+    reason = request.data.get('reason', '')
     # Save current file as a version
     DocumentVersion.objects.create(
         document=document,
@@ -651,6 +638,7 @@ def upload_document_version(request, pk):
         file=document.file,
         file_size=document.file_size or 0,
         changes_description=f"Version {document.version} backup before upload",
+        reason=reason,
         created_by=request.user,
     )
     # Update document with new file

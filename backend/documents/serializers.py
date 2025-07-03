@@ -32,12 +32,13 @@ class DocumentVersionSerializer(serializers.ModelSerializer):
     """Serializer for DocumentVersion model"""
     created_by = UserProfileSerializer(read_only=True)
     file_url = serializers.SerializerMethodField()
+    reason = serializers.CharField(read_only=True)
     
     class Meta:
         model = DocumentVersion
         fields = ('id', 'version_number', 'file', 'file_url', 'file_size', 
-                 'changes_description', 'created_by', 'created_at')
-        read_only_fields = ('id', 'file_size', 'created_by', 'created_at')
+                 'changes_description', 'reason', 'created_by', 'created_at')
+        read_only_fields = ('id', 'file_size', 'created_by', 'created_at', 'reason')
     
     def get_file_url(self, obj):
         if obj.file:

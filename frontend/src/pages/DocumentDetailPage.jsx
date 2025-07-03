@@ -345,6 +345,9 @@ export default function DocumentDetailPage() {
     setShowDeleteModal(false);
   };
 
+  // Always use an array for versions
+  const safeVersions = Array.isArray(versions) ? versions : (versions?.results || []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -757,9 +760,9 @@ export default function DocumentDetailPage() {
               </button>
             </div>
             <div className="p-6 overflow-y-auto bg-gray-50">
-              {versions && (
+              {safeVersions && (
                 <div className="space-y-3">
-                  {versions.map((version) => (
+                  {safeVersions.map((version) => (
                     <div key={version.version_id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300">
                       <div>
                         <div className="flex items-center gap-3">
@@ -770,7 +773,9 @@ export default function DocumentDetailPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-2 text-sm text-slate-600">
                           <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center shadow-sm">
-                            <span className="text-xs font-medium text-slate-600">{version.created_by?.charAt(0) || 'U'}</span>
+                            <span className="text-xs font-medium text-slate-600">
+                              {(version.created_by?.first_name?.charAt(0) || '') + (version.created_by?.last_name?.charAt(0) || '') || 'U'}
+                            </span>
                           </div>
                           <span>{version.created_by}</span>
                           <span className="text-slate-400">•</span>
