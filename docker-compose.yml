@@ -27,8 +27,8 @@ services:
       - DB_PASSWORD=shiv9090
       - DB_HOST=db
       - DB_PORT=5432
-      # AWS credentials and config are loaded from .env file via env_file above
-      
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     ports:
       - "8000:8000"
 
@@ -51,6 +51,7 @@ services:
           path: ./backend/requirements.txt
     depends_on:
       - db
+      - redis
 
   frontend:
     build:
@@ -87,6 +88,31 @@ services:
       - ADMINER_DEFAULT_SERVER=db
     depends_on:
       - db
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  celeryworker:
+    build:
+      context: ./backend
+    container_name: celery_worker
+    command: celery -A backend worker --loglevel=info
+    environment:
+      - DB_NAME=document_db
+      - DB_USER=shiv9090
+      - DB_PASSWORD=shiv9090
+      - DB_HOST=db
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
 
 volumes:
   postgres_data:

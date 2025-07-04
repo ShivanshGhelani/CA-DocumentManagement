@@ -3,30 +3,38 @@ from django.contrib.auth import get_user_model
 from django.core.validators import FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.text import slugify
 import uuid
 import os
 
 User = get_user_model()
 
 def document_upload_path(instance, filename):
-    """Generate structured upload path for S3: documents/{username}/{original_name}/{uuid.ext}"""
+    """
+    Upload path for original file: 
+    documents/{username}/{document_id}_{slug_title}/original/{uuid}.{ext}
+    """
     ext = filename.split('.')[-1]
-    original_name = os.path.splitext(filename)[0]  # Remove extension
     unique_filename = f"{uuid.uuid4()}.{ext}"
-    
-    # Make sure username is safe for paths
+
     username = str(instance.created_by.username).replace(" ", "_")
-    
-    return f"documents/{username}/{original_name}/{unique_filename}"
+    slug_title = slugify(instance.title)
+    document_folder = f"{instance.id}_{slug_title}"
+
+    return f"documents/{username}/{document_folder}/original/{unique_filename}"
 
 # New: versioned upload path for DocumentVersion
 
 def document_version_upload_path(instance, filename):
-    """Generate S3 path for document versions: documents/{username}/{document_id}/all_versions/{version_id}/{filename}"""
+    """
+    Upload path for versioned files:
+    documents/{username}/{document_id}_{slug_title}/versions/{version_number}/{filename}
+    """
     username = str(instance.created_by.username).replace(" ", "_")
-    document_id = str(instance.document.id)
-    version_id = str(instance.id or uuid.uuid4())
-    return f"documents/{username}/{document_id}/all_versions/{version_id}/{filename}"
+    slug_title = slugify(instance.document.title)
+    document_folder = f"{instance.document.id}_{slug_title}"
+    version_number = str(getattr(instance, 'version_number', 'unknown'))  # fallback if not set
+    return f"documents/{username}/{document_folder}/versions/{version_number}/{filename}"
 
 
 
