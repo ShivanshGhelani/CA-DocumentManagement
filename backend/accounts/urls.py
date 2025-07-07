@@ -18,7 +18,10 @@ urlpatterns = [
       # Profile
     path('profile/', views.UserProfileView.as_view(), name='user-profile'),
     path('password/change/', views.PasswordChangeView.as_view(), name='password-change'),
+    path('password/reset/request/', views.password_reset_request, name='password-reset-request'),
+    path('password/reset/confirm/', views.password_reset_confirm, name='password-reset-confirm'),
     path('avatar/upload/', views.AvatarUploadView.as_view(), name='avatar-upload'),
     path('avatar/delete/', views.AvatarDeleteView.as_view(), name='avatar-delete'),
+    path('mfa/backup-codes/request/', views.mfa_request_backup_codes, name='mfa-request-backup-codes'),
     path('users/', views.UserListView.as_view(), name='user-list'),
 ]

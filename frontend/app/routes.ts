@@ -4,6 +4,8 @@ export default [
   index("routes/home.tsx"),
   route("signup", "routes/signup.tsx"), // Added signup route
   route("signin", "routes/signin.tsx"), // Added signin route
+  route("forgot-password", "routes/forgot-password.tsx"), // Added forgot password route
+  route("reset-password", "routes/reset-password.tsx"), // Added reset password route
   route("mfa", "routes/mfa.tsx"), // Added MFA route
   route("documents", "routes/documents.tsx"), // Added documents route
   route("documents/create", "routes/document-create.tsx"), // Added document create route

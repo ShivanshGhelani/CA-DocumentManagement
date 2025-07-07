@@ -4,13 +4,21 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.conf import settings
+from django.utils import timezone
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, MFASetupSerializer,
     MFAVerifySerializer, UserProfileSerializer, PasswordChangeSerializer,
-    UserDetailSerializer
+    UserDetailSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    MFABackupCodesRequestSerializer
 )
+from .utils import send_password_reset_email, send_mfa_backup_codes_email
 from audit.models import AuditLog
+import logging
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -80,6 +88,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 'mfa_code': mfa_code  # Remove this line in production!
             })
         
+        # Set MFA as verified for non-MFA users
+        user.mfa_verified = True
+        user.save()
+        
         # Log successful login
         AuditLog.log_activity(
             user=user,
@@ -132,6 +144,10 @@ def mfa_verify(request):
             {'error': 'Invalid or expired MFA code'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+    # Set MFA as verified
+    user.mfa_verified = True
+    user.save()
     
     # Log successful login
     AuditLog.log_activity(
@@ -449,6 +465,152 @@ def logout(request):
     )
     
     return Response({'message': 'Logout successful'})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def password_reset_request(request):
+    """Request password reset email"""
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    
+    email = serializer.validated_data['email']
+    
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        # Don't reveal whether user exists or not for security
+        return Response({
+            'message': 'If an account with this email exists, a password reset link has been sent.'
+        })
+    
+    # Generate password reset token
+    reset_token = user.generate_password_reset_token()
+    
+    # Send password reset email
+    email_sent = send_password_reset_email(user, reset_token)
+    
+    if email_sent:
+        # Log password reset request (temporarily disabled for debugging)
+        # AuditLog.log_activity(
+        #     user=user,
+        #     action='password_reset_request',
+        #     resource_type='user',
+        #     resource_id=user.id,
+        #     resource_name=user.email,
+        #     request=request
+        # )
+        
+        return Response({
+            'message': 'Password reset email sent successfully. Check your email for further instructions.'
+        })
+    else:
+        return Response(
+            {'error': 'Failed to send password reset email. Please try again later.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def password_reset_confirm(request):
+    """Confirm password reset with token"""
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    
+    token = serializer.validated_data['token']
+    new_password = serializer.validated_data['new_password']
+    email = request.data.get('email')
+    
+    if not email:
+        return Response(
+            {'error': 'Email is required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Invalid reset token'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Reset password with token verification
+    if user.reset_password(new_password, token):
+        # Clear MFA verification state on password reset
+        user.mfa_verified = False
+        user.save()
+        
+        # Log password reset
+        AuditLog.log_activity(
+            user=user,
+            action='password_reset',
+            resource_type='user',
+            resource_id=user.id,
+            resource_name=user.email,
+            request=request
+        )
+        
+        return Response({
+            'message': 'Password reset successful. You can now login with your new password.'
+        })
+    else:
+        return Response(
+            {'error': 'Invalid or expired reset token'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def mfa_request_backup_codes(request):
+    """Request new MFA backup codes via email"""
+    serializer = MFABackupCodesRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    
+    email = serializer.validated_data['email']
+    
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        # Don't reveal whether user exists or not for security
+        return Response({
+            'message': 'If an account with this email exists and has MFA enabled, new backup codes have been sent.'
+        })
+    
+    # Check if user has MFA enabled
+    if not user.is_mfa_enabled:
+        return Response({
+            'error': 'MFA is not enabled for this account.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Generate new backup codes
+    backup_codes = user.generate_backup_codes()
+    
+    # Send backup codes email
+    email_sent = send_mfa_backup_codes_email(user, backup_codes)
+    
+    if email_sent:
+        # Log backup codes request (temporarily disabled for debugging)
+        # AuditLog.log_activity(
+        #     user=user,
+        #     action='mfa_backup_codes_request',
+        #     resource_type='user',
+        #     resource_id=user.id,
+        #     resource_name=user.email,
+        #     details={'codes_count': len(backup_codes)},
+        #     request=request
+        # )
+        
+        return Response({
+            'message': f'New backup codes generated and sent to your email. You now have {len(backup_codes)} backup codes.'
+        })
+    else:
+        return Response(
+            {'error': 'Failed to send backup codes email. Please try again later.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 

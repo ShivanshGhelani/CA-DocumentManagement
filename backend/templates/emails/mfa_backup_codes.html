@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New MFA Backup Codes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8fafc;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #d1fae5;
+            font-size: 16px;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #2d3748;
+        }
+        
+        .message {
+            font-size: 16px;
+            margin-bottom: 30px;
+            color: #4a5568;
+            line-height: 1.7;
+        }
+        
+        .codes-container {
+            background-color: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .codes-title {
+            color: #2d3748;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .codes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .code-item {
+            background-color: #ffffff;
+            border: 1px solid #cbd5e0;
+            padding: 12px 8px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            letter-spacing: 1px;
+        }
+        
+        .instructions {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+        
+        .instructions h3 {
+            color: #92400e;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .instructions ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .instructions li {
+            color: #78350f;
+            font-size: 14px;
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .instructions li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        
+        .security-notice {
+            background-color: #fef2f2;
+            border-left: 4px solid #fca5a5;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+        
+        .security-notice h3 {
+            color: #dc2626;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .security-notice p {
+            color: #991b1b;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .print-section {
+            background-color: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .print-section h3 {
+            color: #065f46;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .print-section p {
+            color: #047857;
+            font-size: 14px;
+        }
+        
+        .footer {
+            background-color: #f7fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .footer p {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .footer .company {
+            color: #2d3748;
+            font-weight: 600;
+        }
+        
+        @media only screen and (max-width: 600px) {
+            .container {
+                margin: 0;
+                box-shadow: none;
+            }
+            
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .codes-container {
+                padding: 20px;
+            }
+            
+            .codes-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            
+            .code-item {
+                font-size: 14px;
+                padding: 10px 6px;
+            }
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+            }
+            
+            .container {
+                box-shadow: none;
+                max-width: none;
+            }
+            
+            .header {
+                background: #10b981 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 New MFA Backup Codes</h1>
+            <p>Document Management System</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Hello {{ user.first_name|default:user.username }},
+            </div>
+            
+            <div class="message">
+                You have successfully generated new backup codes for your Two-Factor Authentication (MFA). These codes can be used to access your account if you lose access to your primary MFA device.
+            </div>
+            
+            <div class="codes-container">
+                <div class="codes-title">Your New Backup Codes</div>
+                <div class="codes-grid">
+                    {% for code in backup_codes %}
+                    <div class="code-item">{{ code }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="instructions">
+                <h3>📝 Important Instructions</h3>
+                <ul>
+                    <li>Save these codes in a secure location (password manager, secure note app, or print them)</li>
+                    <li>Each code can only be used once</li>
+                    <li>Use these codes only when you can't access your primary MFA device</li>
+                    <li>These codes replace any previously generated backup codes</li>
+                    <li>Keep them private and never share them with anyone</li>
+                </ul>
+            </div>
+            
+            <div class="print-section">
+                <h3>💡 Tip</h3>
+                <p>Consider printing this email and storing the printed copy in a safe place. You can use your browser's print function to create a physical backup.</p>
+            </div>
+            
+            <div class="security-notice">
+                <h3>🛡️ Security Reminder</h3>
+                <p>• Your previous backup codes have been invalidated and replaced with these new ones.</p>
+                <p>• If you didn't request new backup codes, please contact support immediately.</p>
+                <p>• Consider enabling additional security measures for your account.</p>
+                <p>• Regularly review your account activity for any suspicious behavior.</p>
+            </div>
+            
+            <div class="message">
+                If you have any questions about using these backup codes or need assistance with your account security, please don't hesitate to contact our support team.
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="company">Document Management System</p>
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p>&copy; {{ current_year }} All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -92,6 +92,31 @@ class MFAVerifySerializer(serializers.Serializer):
         return value
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Serializer for password reset request"""
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Serializer for password reset confirmation"""
+    token = serializers.CharField(max_length=64)
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password]
+    )
+    confirm_password = serializers.CharField(write_only=True)
+    
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError("Passwords don't match")
+        return attrs
+
+
+class MFABackupCodesRequestSerializer(serializers.Serializer):
+    """Serializer for requesting new MFA backup codes"""
+    email = serializers.EmailField()
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for user profile information"""
     avatar_url = serializers.SerializerMethodField()

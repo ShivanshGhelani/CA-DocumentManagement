@@ -12,10 +12,16 @@ const MFASchema = Yup.object().shape({
     .required('Verification code is required'),
 });
 
+const LostCodesSchema = Yup.object().shape({
+  email: Yup.string().email('Invalid email').required('Email is required'),
+});
+
 function MFAPage() {
   const navigate = useNavigate();
   const [userId, setUserId] = useState(null);
   const [mfaCode, setMfaCode] = useState(null); // For development - shows the generated code
+  const [showLostCodes, setShowLostCodes] = useState(false);
+  const [codesRequested, setCodesRequested] = useState(false);
 
   useEffect(() => {
     // Get user ID from localStorage (set during login)
@@ -42,6 +48,13 @@ function MFAPage() {
     },
     onError: (error) => {
       console.error('MFA verification failed:', error);
+    }
+  });
+
+  const lostCodesMutation = useMutation({
+    mutationFn: authAPI.requestMFABackupCodes,
+    onSuccess: () => {
+      setCodesRequested(true);
     }
   });
 
@@ -129,14 +142,24 @@ function MFAPage() {
                     )}
                   </button>
 
-                  <div className="text-center">
+                  <div className="text-center space-y-2">
                     <button
                       type="button"
-                      onClick={() => navigate('/signin')}
-                      className="text-sm text-gray-600 hover:text-gray-800 underline"
+                      onClick={() => setShowLostCodes(true)}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
                     >
-                      Back to Sign In
+                      Lost your backup codes?
                     </button>
+                    
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/signin')}
+                        className="text-sm text-gray-600 hover:text-gray-800 underline"
+                      >
+                        Back to Sign In
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -154,6 +177,121 @@ function MFAPage() {
           </Formik>
         </div>
       </div>
+
+      {/* Lost Codes Modal */}
+      {showLostCodes && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="text-center mb-6">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
+                <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {codesRequested ? 'Backup Codes Sent!' : 'Lost Your Backup Codes?'}
+              </h3>
+              <p className="text-sm text-gray-600">
+                {codesRequested 
+                  ? 'New backup codes have been generated and sent to your email.'
+                  : 'Enter your email to receive new backup codes'
+                }
+              </p>
+            </div>
+
+            {codesRequested ? (
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-700">
+                        Check your email for 7 new backup codes. Each code can only be used once.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setShowLostCodes(false);
+                    setCodesRequested(false);
+                  }}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                {lostCodesMutation.isError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+                    {lostCodesMutation.error.response?.data?.error || 'Failed to send backup codes. Please try again.'}
+                  </div>
+                )}
+
+                <Formik
+                  initialValues={{ email: '' }}
+                  validationSchema={LostCodesSchema}
+                  onSubmit={(values, { setSubmitting }) => {
+                    lostCodesMutation.mutate(values.email, { 
+                      onSettled: () => setSubmitting(false) 
+                    });
+                  }}
+                >
+                  {({ isSubmitting }) => (
+                    <Form className="space-y-4">
+                      <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                          Email Address
+                        </label>
+                        <Field
+                          type="email"
+                          name="email"
+                          placeholder="Enter your email"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <ErrorMessage name="email" component="div" className="text-red-600 text-sm mt-1" />
+                      </div>
+
+                      <div className="flex space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowLostCodes(false);
+                            setCodesRequested(false);
+                          }}
+                          className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting || lostCodesMutation.isLoading}
+                          className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isSubmitting || lostCodesMutation.isLoading ? (
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Sending...
+                            </div>
+                          ) : (
+                            'Send Codes'
+                          )}
+                        </button>
+                      </div>
+                    </Form>
+                  )}
+                </Formik>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

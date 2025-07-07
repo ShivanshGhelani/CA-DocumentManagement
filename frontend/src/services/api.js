@@ -102,6 +102,29 @@ export const authAPI = {
     const response = await apiClient.get('/auth/mfa/backup-codes/status/');
     return response.data;
   },
+
+  // Password reset request
+  requestPasswordReset: async (email) => {
+    const response = await apiClient.post('/auth/password/reset/request/', { email });
+    return response.data;
+  },
+
+  // Password reset confirm
+  confirmPasswordReset: async (token, email, newPassword, confirmPassword) => {
+    const response = await apiClient.post('/auth/password/reset/confirm/', {
+      token,
+      email,
+      new_password: newPassword,
+      confirm_password: confirmPassword
+    });
+    return response.data;
+  },
+
+  // Request MFA backup codes via email
+  requestMFABackupCodes: async (email) => {
+    const response = await apiClient.post('/auth/mfa/request-backup-codes/', { email });
+    return response.data;
+  },
 };
 
 // Documents API

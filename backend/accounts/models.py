@@ -4,6 +4,7 @@ from django.core.validators import FileExtensionValidator
 import pyotp
 import os
 import random
+import secrets
 from datetime import datetime, timedelta
 from django.utils import timezone
 
@@ -40,7 +41,12 @@ class User(AbstractUser):
     mfa_code = models.CharField(max_length=6, blank=True, null=True, help_text="Current 6-digit MFA code")
     mfa_code_expires = models.DateTimeField(blank=True, null=True, help_text="When the MFA code expires")
     mfa_backup_codes = models.JSONField(default=list, blank=True, help_text="List of backup codes for MFA")
+    mfa_verified = models.BooleanField(default=False, help_text="Whether MFA has been verified in current session")
     phone_number = models.CharField(max_length=15, blank=True)
+    
+    # Password reset fields
+    password_reset_token = models.CharField(max_length=64, blank=True, null=True)
+    password_reset_token_expires = models.DateTimeField(blank=True, null=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -125,3 +131,35 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.email
+    
+    def generate_password_reset_token(self):
+        """Generate a secure token for password reset"""
+        self.password_reset_token = secrets.token_urlsafe(32)
+        self.password_reset_token_expires = timezone.now() + timedelta(minutes=10)
+        self.save()
+        return self.password_reset_token
+    
+    def verify_password_reset_token(self, token):
+        """Verify password reset token"""
+        if not self.password_reset_token or not self.password_reset_token_expires:
+            return False
+        
+        if timezone.now() > self.password_reset_token_expires:
+            # Clear expired token
+            self.password_reset_token = None
+            self.password_reset_token_expires = None
+            self.save()
+            return False
+        
+        return self.password_reset_token == token
+    
+    def reset_password(self, new_password, token):
+        """Reset password with token verification"""
+        if not self.verify_password_reset_token(token):
+            return False
+        
+        self.set_password(new_password)
+        self.password_reset_token = None
+        self.password_reset_token_expires = None
+        self.save()
+        return True
