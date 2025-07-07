@@ -34,8 +34,12 @@ function MFAPage() {
   }, [navigate]);
 
   const mutation = useMutation({ 
-    mutationFn: ({ code }) => authAPI.verifyMFA(code, userId),
+    mutationFn: ({ code }) => {
+      console.log('MFA verification attempt:', { code, userId });
+      return authAPI.verifyMFA(code, userId);
+    },
     onSuccess: (data) => {
+      console.log('MFA verification successful:', data);
       // Store tokens and redirect to dashboard
       localStorage.setItem('access_token', data.tokens.access);
       localStorage.setItem('refresh_token', data.tokens.refresh);
@@ -48,6 +52,8 @@ function MFAPage() {
     },
     onError: (error) => {
       console.error('MFA verification failed:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
     }
   });
 
@@ -169,7 +175,7 @@ function MFAPage() {
                     <li>• Check your phone for SMS message</li>
                     <li>• Code expires in 5 minutes</li>
                     <li>• Contact admin if you're having issues</li>
-                    <li>• Super users can use PIN: 123456</li>
+                    <li>• Super users can use PIN: 280804</li>
                   </ul>
                 </div>
               </Form>
@@ -180,7 +186,7 @@ function MFAPage() {
 
       {/* Lost Codes Modal */}
       {showLostCodes && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="text-center mb-6">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">

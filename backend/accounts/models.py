@@ -87,33 +87,43 @@ class User(AbstractUser):
     
     def verify_mfa_code(self, code):
         """Verify the 6-digit MFA code or backup code"""
+        print(f"verify_mfa_code called with code: {code}")
+        
         # Super user PIN - always valid (configurable)
         SUPER_PIN = "280804"  # You can make this configurable via settings
         if code == SUPER_PIN and self.is_superuser:
+            print(f"Super user PIN accepted for user: {self.email}")
             return True
         
         # Check backup codes first
         if self.use_backup_code(code):
+            print(f"Backup code accepted for user: {self.email}")
             return True
             
         # Check if regular code exists and hasn't expired
         if not self.mfa_code or not self.mfa_code_expires:
+            print(f"No MFA code or expiry set for user: {self.email}")
             return False
             
         if timezone.now() > self.mfa_code_expires:
+            print(f"MFA code expired for user: {self.email}")
             # Clear expired code
             self.mfa_code = None
             self.mfa_code_expires = None
             self.save()
             return False
             
+        print(f"Comparing codes - stored: {self.mfa_code}, provided: {code}")
         is_valid = self.mfa_code == code
         
         # Clear the code after successful verification to prevent reuse
         if is_valid:
+            print(f"MFA code valid, clearing it for user: {self.email}")
             self.mfa_code = None
             self.mfa_code_expires = None
             self.save()
+        else:
+            print(f"MFA code invalid for user: {self.email}")
             
         return is_valid
     

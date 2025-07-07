@@ -79,9 +79,6 @@ function SignupPage() {
 
         {/* Auth Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        </div>
-          </div>
-
           {/* Error/Success Messages */}
           {mutation.isError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
@@ -335,7 +332,8 @@ function SignupPage() {
             </p>
           </div>
         </div>
-
+      </div>
+    </div>
   );
 }
 

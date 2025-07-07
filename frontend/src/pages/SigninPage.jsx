@@ -6,13 +6,20 @@ import { authAPI } from '../services/api';
 import { useNavigate, Link } from 'react-router';
 
 const SigninSchema = Yup.object().shape({
-  username: Yup.string().required('Username is required'),
+  email: Yup.string().email('Invalid email').required('Email is required'),
   password: Yup.string().required('Password is required'),
 });
 
 const signinUser = async (userData) => {
-  const response = await authAPI.login(userData);
-  return response;
+  console.log('Attempting to sign in with:', userData);
+  try {
+    const response = await authAPI.login(userData);
+    console.log('Login response:', response);
+    return response;
+  } catch (error) {
+    console.error('Login function error:', error);
+    throw error;
+  }
 };
 
 function SigninPage() {
@@ -23,30 +30,45 @@ function SigninPage() {
     mutationFn: signinUser,
     onSuccess: (data) => {
       console.log('Signin successful:', data);
+      console.log('Data structure:', JSON.stringify(data, null, 2));
 
       // Check if MFA is required
-      if (data.mfa_required) {
-        // Store temp token for MFA verification
-        localStorage.setItem('temp_token', data.temp_token);
-        localStorage.setItem('user_id', data.user.id);
+      if (data.requires_mfa) {
+        // Store temp data for MFA verification
+        localStorage.setItem('temp_user_id', data.user_id);
         navigate('/mfa');
-      } else {
+      } else if (data.tokens && data.tokens.access) {
         // Normal login flow
         localStorage.setItem('access_token', data.tokens.access);
         localStorage.setItem('refresh_token', data.tokens.refresh);
         localStorage.setItem('user', JSON.stringify(data.user));
         navigate('/documents');
+      } else {
+        console.error('Unexpected response structure:', data);
+        // Fallback - check if tokens exist in different structure
+        if (data.access) {
+          localStorage.setItem('access_token', data.access);
+          localStorage.setItem('refresh_token', data.refresh);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          navigate('/documents');
+        }
       }
     },
     onError: (error) => {
-      console.error('Signin error:', error.response?.data || error.message);
+      console.error('Signin error details:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
     },
   });
 
   return (
-    <div className="flex bg-gray-50 items-center justify-center mx-25 my-25">
+    <div className="h-screen bg-gray-50 flex items-center justify-center">
       {/* Main Content */}
-      <div className="w-2xl max-w-md mx-auto p-6">
+      <div className="w-full max-w-md mx-auto p-6">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Sign In</h1>
@@ -55,12 +77,23 @@ function SigninPage() {
 
         {/* Auth Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-
+          {/* Tab Navigation */}
+          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+            <div className="flex-1 text-center py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-medium">
+              Sign In
+            </div>
+            <Link
+              to="/signup"
+              className="flex-1 text-center py-2 px-4 text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors"
+            >
+              Sign Up
+            </Link>
+          </div>
 
           {/* Error Message */}
           {mutation.isError && (
-            <div className="bg-red-50/80 backdrop-blur-sm border border-red-200/50 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               {mutation.error.response?.data?.message || mutation.error.message || 'Sign in failed. Please try again.'}
@@ -70,7 +103,7 @@ function SigninPage() {
           {/* Login Form */}
           <Formik
             initialValues={{
-              username: '',
+              email: '',
               password: '',
             }}
             validationSchema={SigninSchema}
@@ -83,50 +116,47 @@ function SigninPage() {
             }}
           >
             {({ isSubmitting }) => (
-              <Form className="space-y-6">
-                {/* Username Field */}
+              <Form className="space-y-4">
+                {/* Email Field */}
                 <div>
-                  <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                    Username
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
                   </label>
                   <Field
-                    type="text"
-                    name="username"
-                    className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-300/50 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:bg-white/70"
-                    placeholder="Enter your username"
+                    type="email"
+                    name="email"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your email"
                   />
-                  <ErrorMessage name="username" component="div" className="text-red-600 text-sm mt-1" />
+                  <ErrorMessage name="email" component="div" className="text-red-600 text-sm mt-1" />
                 </div>
 
                 {/* Password Field */}
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                     Password
                   </label>
                   <div className="relative">
                     <Field
                       type={showPassword ? 'text' : 'password'}
                       name="password"
-                      className="w-full px-4 py-3 pr-12 bg-white/50 backdrop-blur-sm border border-gray-300/50 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:bg-white/70"
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Enter your password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                     >
                       {showPassword ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
-
-
                       ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
                         </svg>
-
                       )}
                     </button>
                   </div>
@@ -137,7 +167,7 @@ function SigninPage() {
                 <div className="text-right">
                   <Link
                     to="/forgot-password"
-                    className="text-sm text-blue-600 hover:text-blue-500 transition-colors"
+                    className="text-sm text-blue-600 hover:text-blue-800"
                   >
                     Forgot your password?
                   </Link>
@@ -147,19 +177,9 @@ function SigninPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting || mutation.isLoading}
-                  className="w-full bg-gradient-to-r   from-blue-600 to-indigo-600 text-white py-3 rounded-xl text-lg font-medium shadow-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting || mutation.isLoading ? (
-                    <div className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Signing In...
-                    </div>
-                  ) : (
-                    'Sign In'
-                  )}
+                  {isSubmitting || mutation.isLoading ? 'Signing In...' : 'Sign In'}
                 </button>
               </Form>
             )}
@@ -169,7 +189,7 @@ function SigninPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
-              <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+              <Link to="/signup" className="text-blue-600 hover:text-blue-800 font-medium">
                 Sign up here
               </Link>
             </p>

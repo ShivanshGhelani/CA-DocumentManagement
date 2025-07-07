@@ -1,7 +1,7 @@
 import type { Route } from "./+types/signin";
 // @ts-ignore
 import SigninPage from '../../src/pages/SigninPage.jsx';
-
+import Navigation from "../../src/components/Navigation";
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Sign In - Document Management System" },
@@ -10,5 +10,10 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function SigninRoute() {
-  return <SigninPage />;
+  return (
+    <>
+      <Navigation />
+      <SigninPage />
+    </>
+  );
 }

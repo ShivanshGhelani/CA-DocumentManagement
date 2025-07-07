@@ -119,27 +119,39 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 @permission_classes([permissions.AllowAny])
 def mfa_verify(request):
     """Verify MFA token and complete login"""
+    print(f"MFA verification request data: {request.data}")
+    
     serializer = MFAVerifySerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     
     user_id = request.data.get('user_id')
     token = serializer.validated_data['token']
     
+    print(f"MFA verification - user_id: {user_id}, token: {token}")
+    
     try:
         user = User.objects.get(id=user_id)
+        print(f"Found user: {user.email}, is_mfa_enabled: {user.is_mfa_enabled}")
+        print(f"User stored MFA code: {user.mfa_code}, expires: {user.mfa_code_expires}")
     except User.DoesNotExist:
+        print(f"User not found with id: {user_id}")
         return Response(
             {'error': 'Invalid user'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
     if not user.is_mfa_enabled:
+        print("MFA not enabled for user")
         return Response(
             {'error': 'MFA not enabled for this user'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    if not user.verify_mfa_code(token):
+    print(f"Calling verify_mfa_code with token: {token}")
+    is_valid = user.verify_mfa_code(token)
+    print(f"MFA verification result: {is_valid}")
+    
+    if not is_valid:
         return Response(
             {'error': 'Invalid or expired MFA code'}, 
             status=status.HTTP_400_BAD_REQUEST

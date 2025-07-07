@@ -122,7 +122,7 @@ export const authAPI = {
 
   // Request MFA backup codes via email
   requestMFABackupCodes: async (email) => {
-    const response = await apiClient.post('/auth/mfa/request-backup-codes/', { email });
+    const response = await apiClient.post('/auth/mfa/backup-codes/request/', { email });
     return response.data;
   },
 };
