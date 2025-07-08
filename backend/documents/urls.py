@@ -18,6 +18,9 @@ urlpatterns = [    # Tags
     path('documents/<uuid:pk>/upload-version/', views.upload_document_version, name='document-upload-version'),
     
     # Document Versions
-    path('documents/<uuid:document_id>/versions/', views.DocumentVersionListView.as_view(), name='document-versions'),
-    path('documents/<uuid:pk>/rollback/', views.document_rollback, name='document-rollback'),
+    path('documents/<uuid:pk>/versions/', views.document_version_history, name='document-version-history'),
+    path('documents/<uuid:pk>/versions/create/', views.create_document_version, name='create-document-version'),
+    path('documents/<uuid:pk>/versions/<uuid:version_id>/download/', views.download_document_version, name='download-document-version'),
+    path('documents/<uuid:pk>/rollback/', views.rollback_document, name='rollback-document'),
+    path('documents/<uuid:pk>/metadata/', views.get_document_metadata_for_version, name='get-document-metadata'),
 ]

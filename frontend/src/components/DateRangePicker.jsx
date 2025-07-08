@@ -6,22 +6,23 @@ const CalendarDateRangePicker = ({ onRangeSelected, onClose, value, popoverOpen 
   const [selectedRange, setSelectedRange] = useState({ start: null, end: null });
   const [hoverDate, setHoverDate] = useState(null);
 
-  // Debug: log when picker is rendered
   useEffect(() => {
     console.log('DateRangePicker rendered, popoverOpen:', popoverOpen, 'value:', value);
   }, [popoverOpen, value]);
 
-  // Sync selectedRange with value prop and popover open state
   useEffect(() => {
-    if (popoverOpen && value && (
-      !selectedRange.start ||
-      !selectedRange.end ||
-      value.start?.getTime() !== selectedRange.start?.getTime() ||
-      value.end?.getTime() !== selectedRange.end?.getTime()
-    )) {
-      setSelectedRange(value);
-      if (value.start) setCurrentDate(new Date(value.start));
-      console.log('DateRangePicker useEffect: syncing selectedRange with value');
+    if (popoverOpen && value) {
+      const valueStart = value.start ? value.start.getTime() : null;
+      const valueEnd = value.end ? value.end.getTime() : null;
+      const currentStart = selectedRange.start ? selectedRange.start.getTime() : null;
+      const currentEnd = selectedRange.end ? selectedRange.end.getTime() : null;
+
+      if (valueStart !== currentStart || valueEnd !== currentEnd) {
+        setSelectedRange(value);
+        if (value.start) {
+          setCurrentDate(new Date(value.start));
+        }
+      }
     }
   }, [value, popoverOpen]);
 
@@ -51,13 +52,14 @@ const CalendarDateRangePicker = ({ onRangeSelected, onClose, value, popoverOpen 
     const days = [];
 
     // Previous month's days
-    const prevMonth = new Date(year, month - 1, 0);
+    const prevMonth = new Date(year, month, 0); // last day of previous month
     const prevMonthDays = prevMonth.getDate();
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+      const dateNum = prevMonthDays - i;
       days.push({
-        date: prevMonthDays - i,
+        date: dateNum,
         isCurrentMonth: false,
-        fullDate: new Date(year, month - 1, prevMonthDays - i)
+        fullDate: new Date(year, month - 1, dateNum)
       });
     }
 
@@ -84,66 +86,84 @@ const CalendarDateRangePicker = ({ onRangeSelected, onClose, value, popoverOpen 
   };
 
   const handleDateClick = (dayObj) => {
-    const clickedDate = dayObj.fullDate;
+    const clickedDate = new Date(dayObj.fullDate);
+    clickedDate.setHours(0, 0, 0, 0);
+
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
       setSelectedRange({ start: clickedDate, end: null });
     } else if (selectedRange.start && !selectedRange.end) {
-      if (clickedDate < selectedRange.start) {
-        setSelectedRange({ start: clickedDate, end: selectedRange.start });
+      const startDate = new Date(selectedRange.start);
+      startDate.setHours(0, 0, 0, 0);
+
+      if (clickedDate.getTime() < startDate.getTime()) {
+        setSelectedRange({ start: clickedDate, end: startDate });
+      } else if (clickedDate.getTime() > startDate.getTime()) {
+        setSelectedRange({ start: startDate, end: clickedDate });
       } else {
-        setSelectedRange({ start: selectedRange.start, end: clickedDate });
+        setSelectedRange({ start: clickedDate, end: null });
       }
     }
   };
 
-  // When both dates are selected, call onRangeSelected (but do not close automatically)
   useEffect(() => {
-    if (selectedRange.start && selectedRange.end) {
-      if (onRangeSelected) onRangeSelected(selectedRange);
-      // Do not call onClose() here; let parent control closing
+    if (selectedRange.start && selectedRange.end && onRangeSelected) {
+      onRangeSelected(selectedRange);
     }
   }, [selectedRange, onRangeSelected]);
 
+  const normalizeDate = (date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+
   const isDateInRange = (date) => {
     if (!selectedRange.start || !selectedRange.end) return false;
-    return date >= selectedRange.start && date <= selectedRange.end;
+    const dateTime = normalizeDate(date);
+    const startTime = normalizeDate(selectedRange.start);
+    const endTime = normalizeDate(selectedRange.end);
+    return dateTime >= startTime && dateTime <= endTime;
   };
 
   const isDateSelected = (date) => {
     if (!selectedRange.start) return false;
-    if (selectedRange.start && selectedRange.end) {
-      return date.getTime() === selectedRange.start.getTime() || 
-             date.getTime() === selectedRange.end.getTime();
+    const dateTime = normalizeDate(date);
+    const startTime = normalizeDate(selectedRange.start);
+
+    if (selectedRange.end) {
+      const endTime = normalizeDate(selectedRange.end);
+      return dateTime === startTime || dateTime === endTime;
     }
-    return date.getTime() === selectedRange.start.getTime();
+
+    return dateTime === startTime;
   };
 
   const isDateInHoverRange = (date) => {
     if (!selectedRange.start || selectedRange.end || !hoverDate) return false;
-    const start = selectedRange.start < hoverDate ? selectedRange.start : hoverDate;
-    const end = selectedRange.start < hoverDate ? hoverDate : selectedRange.start;
-    return date >= start && date <= end;
+    const startTime = normalizeDate(selectedRange.start);
+    const hoverTime = normalizeDate(hoverDate);
+    const dateTime = normalizeDate(date);
+
+    const [rangeStart, rangeEnd] = startTime < hoverTime
+      ? [startTime, hoverTime]
+      : [hoverTime, startTime];
+
+    return dateTime >= rangeStart && dateTime <= rangeEnd;
   };
 
   const days = getDaysInMonth(currentDate);
 
   return (
-    <div className="w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-2 font-sans">
+    <div className="w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-2 font-sans">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={() => navigateMonth(-1)}
-          className="p-1 hover:bg-gray-100 rounded"
-        >
+        <button onClick={() => navigateMonth(-1)} className="p-1 hover:bg-gray-100 rounded">
           <ChevronLeft size={18} className="text-gray-600" />
         </button>
         <h2 className="text-base font-medium text-gray-900">
           {months[currentDate.getMonth()]} {currentDate.getFullYear()}
         </h2>
-        <button
-          onClick={() => navigateMonth(1)}
-          className="p-1 hover:bg-gray-100 rounded"
-        >
+        <button onClick={() => navigateMonth(1)} className="p-1 hover:bg-gray-100 rounded">
           <ChevronRight size={18} className="text-gray-600" />
         </button>
       </div>
@@ -158,12 +178,12 @@ const CalendarDateRangePicker = ({ onRangeSelected, onClose, value, popoverOpen 
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-0.5 mb-3">
         {days.map((dayObj, index) => {
           const isSelected = isDateSelected(dayObj.fullDate);
           const isInRange = isDateInRange(dayObj.fullDate);
           const isInHoverRange = isDateInHoverRange(dayObj.fullDate);
-          const isToday = dayObj.fullDate.toDateString() === new Date().toDateString();
+          const isToday = normalizeDate(dayObj.fullDate) === normalizeDate(new Date());
 
           return (
             <button
@@ -173,32 +193,36 @@ const CalendarDateRangePicker = ({ onRangeSelected, onClose, value, popoverOpen 
               onMouseLeave={() => setHoverDate(null)}
               className={`
                 w-8 h-8 text-xs rounded border-0 cursor-pointer transition-all duration-200
-                ${!dayObj.isCurrentMonth 
-                  ? 'text-gray-400 hover:bg-gray-100' 
-                  : 'text-gray-900 hover:bg-gray-100'
-                }
-                ${isSelected 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                  : ''
-                }
-                ${isInRange && !isSelected 
-                  ? 'bg-blue-100 text-blue-900' 
-                  : ''
-                }
-                ${isInHoverRange && !isSelected 
-                  ? 'bg-blue-50 text-blue-700' 
-                  : ''
-                }
-                ${isToday && !isSelected 
-                  ? 'bg-blue-50 text-blue-600 font-semibold' 
-                  : ''
-                }
+                ${!dayObj.isCurrentMonth ? 'text-gray-400 hover:bg-gray-100' : 'text-gray-900 hover:bg-gray-100'}
+                ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                ${isInRange && !isSelected ? 'bg-blue-100 text-blue-900' : ''}
+                ${isInHoverRange && !isSelected ? 'bg-blue-50 text-blue-700' : ''}
+                ${isToday && !isSelected ? 'bg-green-100 text-green-600 font-semibold' : ''}
               `}
             >
               {dayObj.date}
             </button>
           );
         })}
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+        <button
+          onClick={() => {
+            setSelectedRange({ start: null, end: null });
+            if (onRangeSelected) onRangeSelected({ start: null, end: null });
+          }}
+          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+        >
+          Clear
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+        >
+          Done
+        </button>
       </div>
     </div>
   );

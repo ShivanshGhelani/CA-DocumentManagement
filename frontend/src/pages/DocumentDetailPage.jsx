@@ -4,6 +4,8 @@ import { useParams, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/axios';
 import mammoth from 'mammoth';
+import VersionHistoryModal from '../components/VersionHistoryModal';
+import NewVersionModal from '../components/NewVersionModal';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -216,6 +218,10 @@ export default function DocumentDetailPage() {
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [pdfPageWidth, setPdfPageWidth] = useState(800);
   const pdfContainerRef = useRef(null);
+  
+  // Version management state
+  const [showVersionHistoryModal, setShowVersionHistoryModal] = useState(false);
+  const [showNewVersionModal, setShowNewVersionModal] = useState(false);
 
   // Fetch current user data
   useEffect(() => {
@@ -517,17 +523,40 @@ export default function DocumentDetailPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </button>
-                  {/* Only show edit button if current user is the document owner */}
+                  
+                  {/* Only show version management buttons if current user is the document owner */}
                   {isOwner && (
-                    <button
-                      onClick={() => navigate(`/documents/${id}/edit`)}
-                      className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                      title="Edit"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
+                    <>
+                      {/* Version History Button */}
+                      <button
+                        onClick={() => setShowVersionHistoryModal(true)}
+                        className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+                        title="Version History"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      
+                      <button
+                        onClick={() => setShowNewVersionModal(true)}
+                        className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+                        title="Upload New Version"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => navigate(`/documents/${id}/edit`)}
+                        className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+                        title="Edit"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -705,24 +734,23 @@ export default function DocumentDetailPage() {
                 Quick Actions
               </h3>
               <div className="space-y-3">
-                <button
-                  onClick={() => setShowVersions(true)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/70 rounded-xl transition-all group border border-slate-200/50 hover:shadow-md"
-                >
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="font-semibold text-slate-900">Version History</span>
-                  </div>
-                  <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-                {currentUser && document.created_by &&
-                  (currentUser.id === document.created_by.id ||
-                    (currentUser.first_name === document.created_by.first_name &&
-                      currentUser.last_name === document.created_by.last_name)) && (
+                {/* Only show version history and delete for document owners */}
+                {isOwner && (
+                  <>
+                    <button
+                      onClick={() => setShowVersions(true)}
+                      className="w-full flex items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/70 rounded-xl transition-all group border border-slate-200/50 hover:shadow-md"
+                    >
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="font-semibold text-slate-900">Version History</span>
+                      </div>
+                      <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
                     <button
                       onClick={handleDeleteClick}
                       className="w-full flex items-center justify-between p-4 bg-red-50/70 hover:bg-red-100/70 rounded-xl transition-all text-left text-red-700 group border border-red-200/50 hover:shadow-md"
@@ -737,7 +765,19 @@ export default function DocumentDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
-                  )}
+                  </>
+                )}
+                {/* Show basic info for non-owners */}
+                {!isOwner && (
+                  <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/50">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-slate-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-slate-600">Document owned by {document.created_by?.first_name} {document.created_by?.last_name}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </aside>
@@ -782,7 +822,7 @@ export default function DocumentDetailPage() {
                           <span>{new Date(version.created_at).toLocaleString()}</span>
                         </div>
                       </div>
-                      {version.version_id !== document.version && (
+                      {version.version_id !== document.version && isOwner && (
                         <button
                           onClick={() => handleRollback(version.version_id)}
                           disabled={rollbackMutation.isLoading}
@@ -933,6 +973,22 @@ export default function DocumentDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Version Management Modals */}
+      <VersionHistoryModal
+        document={document}
+        isOpen={showVersionHistoryModal}
+        onClose={() => setShowVersionHistoryModal(false)}
+        isOwner={isOwner}
+      />
+      
+      {isOwner && (
+        <NewVersionModal
+          document={document}
+          isOpen={showNewVersionModal}
+          onClose={() => setShowNewVersionModal(false)}
+        />
       )}
     </main>
   );

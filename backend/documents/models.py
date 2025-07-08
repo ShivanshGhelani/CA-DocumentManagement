@@ -79,7 +79,7 @@ class Tag(models.Model):
 
 
 class Document(models.Model):
-    """Main document model"""
+    """Main document model with pointer-based versioning"""
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('published', 'Published'),
@@ -88,18 +88,21 @@ class Document(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     short_id = models.CharField(max_length=12, unique=True, editable=False, blank=True, help_text="Short, unique, human-friendly document ID")
-    title = models.CharField(max_length=100)  # Updated max length to 100
+    
+    # Basic metadata (can be updated independently of versions)
+    title = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    content = models.TextField(blank=True, help_text="Document content (optional if file is provided)")
-    file = models.FileField(
-        upload_to=document_upload_path,
-        blank=True,  # Made optional since content can be provided instead
-        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'docx', 'txt'])]
-    )
-    file_size = models.PositiveIntegerField(null=True, blank=True)  # in bytes, optional now
-    file_type = models.CharField(max_length=10, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
-    version = models.PositiveIntegerField(default=1)
+    
+    # Versioning - pointer to current active version
+    current_version = models.ForeignKey(
+        'DocumentVersion', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='documents_pointing_to_this_version',
+        help_text="Points to the currently active version"
+    )
     
     # Relationships
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
@@ -119,7 +122,8 @@ class Document(models.Model):
         blank=True, 
         related_name='deleted_documents'
     )
-      # Custom manager
+    
+    # Custom manager
     objects = DocumentManager()
     
     class Meta:
@@ -139,6 +143,80 @@ class Document(models.Model):
         self.deleted_at = None
         self.deleted_by = None
         self.save()
+
+    def rollback_to_version(self, version_id, user):
+        """Rollback document to a specific version (owner only)"""
+        # Check if user is the owner
+        if self.created_by != user:
+            return False, "Only the document owner can rollback versions"
+            
+        try:
+            version = self.versions.get(id=version_id)
+            self.current_version = version
+            self.updated_at = timezone.now()
+            self.save()
+            
+            # Create audit log for rollback
+            DocumentAuditLog.objects.create(
+                document=self,
+                action='rollback',
+                performed_by=user,
+                details=f"Rolled back to version {version.version_number}",
+                version=version
+            )
+            return True, "Successfully rolled back"
+        except DocumentVersion.DoesNotExist:
+            return False, "Version not found"
+
+    def get_latest_version_number(self):
+        """Get the latest version number for this document"""
+        latest = self.versions.order_by('-version_number').first()
+        return latest.version_number if latest else 0
+
+    def create_new_version(self, file, user, inherit_metadata=True, **metadata):
+        """Create a new version of the document (owner only)"""
+        # Check if user is the owner
+        if self.created_by != user:
+            return None, "Only the document owner can create new versions"
+            
+        latest_version_number = self.get_latest_version_number()
+        new_version_number = latest_version_number + 1
+        
+        # Create new version
+        new_version = DocumentVersion.objects.create(
+            document=self,
+            version_number=new_version_number,
+            file=file,
+            created_by=user,
+            **metadata
+        )
+        
+        # If inheriting metadata, copy from current document
+        if inherit_metadata:
+            # Copy tags
+            new_version.tags.set(self.tags.all())
+            # Copy other metadata if not explicitly provided
+            if 'title' not in metadata:
+                new_version.title = self.title
+            if 'description' not in metadata:
+                new_version.description = self.description
+            new_version.save()
+        
+        # Update pointer to new version
+        self.current_version = new_version
+        self.updated_at = timezone.now()
+        self.save()
+        
+        # Create audit log
+        DocumentAuditLog.objects.create(
+            document=self,
+            action='version_created',
+            performed_by=user,
+            details=f"Created version {new_version_number}",
+            version=new_version
+        )
+        
+        return new_version, "Version created successfully"
 
     def save(self, *args, **kwargs):
         if not self.short_id:
@@ -165,38 +243,60 @@ class Document(models.Model):
                     continue
             next_number = max_num + 1
             self.short_id = f"{initials}D{next_number:03d}"
-        if self.file:
-            try:
-                self.file_size = self.file.size
-                self.file_type = self.file.name.split('.')[-1].lower()
-            except FileNotFoundError:
-                self.file_size = None
-                self.file_type = None
         super().save(*args, **kwargs)
-    
-    def clean(self):
-        """Model-level validation to ensure either content or file is provided"""
-        if not self.content and not self.file:
-            raise ValidationError("Either content or file must be provided.")
-        
-        # Validate file size if file is provided
-        if self.file and self.file.size > 10 * 1024 * 1024:  # 10MB limit
-            raise ValidationError("File size cannot exceed 10MB.")
 
     def __str__(self):
-        return f"{self.title} (v{self.version})"
+        version_info = f"v{self.current_version.version_number}" if self.current_version else "no version"
+        return f"{self.title} ({version_info})"
+
+    @property
+    def file(self):
+        """Get file from current version"""
+        return self.current_version.file if self.current_version else None
+    
+    @property
+    def file_size(self):
+        """Get file size from current version"""
+        return self.current_version.file_size if self.current_version else None
+    
+    @property
+    def file_type(self):
+        """Get file type from current version"""
+        return self.current_version.file_type if self.current_version else None
+    
+    @property
+    def version_number(self):
+        """Get current version number"""
+        return self.current_version.version_number if self.current_version else None
 
 
 class DocumentVersion(models.Model):
-    """Document version history"""
+    """Document version history with full metadata"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='versions')
     version_number = models.PositiveIntegerField()
-    file = models.FileField(upload_to=document_version_upload_path)
+    
+    # Version-specific metadata
+    title = models.CharField(max_length=100, help_text="Title for this version")
+    description = models.TextField(blank=True, help_text="Description for this version")
+    
+    # File information
+    file = models.FileField(
+        upload_to=document_version_upload_path,
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])]
+    )
     file_size = models.PositiveIntegerField()
-    changes_description = models.TextField(blank=True)
+    file_type = models.CharField(max_length=10, blank=True)
+    
+    # Version metadata
+    changes_description = models.TextField(blank=True, help_text="Description of changes made in this version")
     reason = models.CharField(max_length=255, blank=True, help_text="Reason for uploading this version")
+    
+    # Relationships
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='document_versions')
+    
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -205,13 +305,43 @@ class DocumentVersion(models.Model):
     
     def save(self, *args, **kwargs):
         if self.file:
-            self.file_size = self.file.size
+            try:
+                self.file_size = self.file.size
+                self.file_type = self.file.name.split('.')[-1].lower()
+            except:
+                self.file_size = 0
+                self.file_type = ''
         if self.reason and not self.changes_description:
             self.changes_description = self.reason
         super().save(*args, **kwargs)
     
     def __str__(self):
         return f"{self.document.title} v{self.version_number}"
+
+
+class DocumentAuditLog(models.Model):
+    """Audit log for document actions"""
+    ACTION_CHOICES = [
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('rollback', 'Rollback'),
+        ('download', 'Download'),
+        ('view', 'View'),
+    ]
+    
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='audit_logs')
+    version = models.ForeignKey(DocumentVersion, on_delete=models.CASCADE, null=True, blank=True, related_name='audit_logs')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    performed_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    details = models.TextField(blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"{self.action} on {self.document.title} by {self.performed_by.email}"
 
 
 class DocumentAccess(models.Model):

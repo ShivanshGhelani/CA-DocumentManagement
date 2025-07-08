@@ -218,18 +218,9 @@ export const documentsAPI = {
     return response.data;
   },
 
-  // Get document versions
+  // Get document versions (legacy - use getDocumentVersionHistory instead)
   getDocumentVersions: async (documentId) => {
     const response = await apiClient.get(`/documents/${documentId}/versions/`);
-    return response.data;
-  },
-
-  // Rollback document to a previous version
-  rollbackDocument: async (id, versionId, reason = "") => {
-    const response = await apiClient.post(`/documents/${id}/rollback/`, {
-      version_id: versionId,
-      reason,
-    });
     return response.data;
   },
 
@@ -246,6 +237,44 @@ export const documentsAPI = {
       { status },
       { headers: { 'Content-Type': 'application/json' } }
     );
+    return response.data;
+  },
+
+  // Get document version history
+  getDocumentVersionHistory: async (documentId) => {
+    const response = await apiClient.get(`/documents/${documentId}/versions/`);
+    return response.data;
+  },
+
+  // Create new document version
+  createDocumentVersion: async (documentId, formData) => {
+    const response = await apiClient.post(`/documents/${documentId}/versions/create/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Download specific document version
+  downloadDocumentVersion: async (documentId, versionId) => {
+    const response = await apiClient.get(`/documents/${documentId}/versions/${versionId}/download/`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // Get document metadata for version creation
+  getDocumentMetadata: async (documentId) => {
+    const response = await apiClient.get(`/documents/${documentId}/metadata/`);
+    return response.data;
+  },
+
+  // Rollback document to a specific version (updated)
+  rollbackDocument: async (documentId, versionId) => {
+    const response = await apiClient.post(`/documents/${documentId}/rollback/`, {
+      version_id: versionId
+    });
     return response.data;
   },
 };

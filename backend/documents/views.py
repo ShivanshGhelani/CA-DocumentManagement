@@ -13,6 +13,8 @@ from .serializers import (
     DocumentVersionSerializer,
     DocumentAccessSerializer,
     DocumentRollbackSerializer,
+    DocumentVersionHistorySerializer,
+    DocumentVersionCreateSerializer,
 )
 from .filters import DocumentFilter
 from audit.models import AuditLog
@@ -653,3 +655,186 @@ def upload_document_version(request, pk):
     # Return updated document detail
     serializer = DocumentDetailSerializer(document, context={"request": request})
     return Response(serializer.data)
+
+# Document Versioning Views
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def document_version_history(request, pk):
+    """Get version history for a document"""
+    try:
+        document = Document.objects.get(pk=pk)
+    except Document.DoesNotExist:
+        return Response({"detail": "Document not found."}, status=404)
+    
+    # Check if user has permission to view document
+    if document.created_by != request.user:
+        access = document.access_permissions.filter(
+            user=request.user,
+            permission__in=['read', 'write', 'admin']
+        ).first()
+        if not access:
+            return Response({"detail": "You do not have permission to view this document."}, status=403)
+    
+    versions = document.versions.all().order_by('-version_number')
+    serializer = DocumentVersionHistorySerializer(versions, many=True, context={'request': request})
+    
+    return Response({
+        'document_id': document.id,
+        'document_title': document.title,
+        'current_version': document.current_version.version_number if document.current_version else None,
+        'versions': serializer.data
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_document_version(request, pk):
+    """Create a new version of a document (owner only)"""
+    try:
+        document = Document.objects.get(pk=pk)
+    except Document.DoesNotExist:
+        return Response({"detail": "Document not found."}, status=404)
+    
+    # Check if user is the document owner
+    if document.created_by != request.user:
+        return Response({"detail": "Only the document owner can create new versions."}, status=403)
+    
+    serializer = DocumentVersionCreateSerializer(
+        data=request.data,
+        context={'request': request, 'document': document}
+    )
+    
+    if serializer.is_valid():
+        new_version = serializer.save()
+        
+        # Log version creation
+        AuditLog.log_activity(
+            user=request.user,
+            action="create",
+            resource_type="document_version",
+            resource_id=str(new_version.id),
+            resource_name=f"{document.title} v{new_version.version_number}",
+            details={
+                "document_id": str(document.id),
+                "version_number": new_version.version_number,
+                "reason": new_version.reason
+            },
+            content_object=new_version,
+            request=request,
+        )
+        
+        # Sync S3 tags if file exists
+        tags_dict = {tag.key: tag.value for tag in new_version.tags.all()}
+        if new_version.file:
+            update_s3_object_tags(new_version.file.name, tags_dict)
+        
+        return Response(
+            DocumentVersionHistorySerializer(new_version, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def rollback_document(request, pk):
+    """Rollback document to a specific version (owner only)"""
+    try:
+        document = Document.objects.get(pk=pk)
+    except Document.DoesNotExist:
+        return Response({"detail": "Document not found."}, status=404)
+    
+    # Check if user is the document owner
+    if document.created_by != request.user:
+        return Response({"detail": "Only the document owner can rollback versions."}, status=403)
+    
+    serializer = DocumentRollbackSerializer(
+        data=request.data,
+        context={'request': request, 'document': document}
+    )
+    
+    if serializer.is_valid():
+        updated_document = serializer.save()
+        
+        return Response(
+            DocumentDetailSerializer(updated_document, context={'request': request}).data,
+            status=status.HTTP_200_OK
+        )
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def download_document_version(request, pk, version_id):
+    """Download a specific version of a document"""
+    try:
+        document = Document.objects.get(pk=pk)
+        version = document.versions.get(id=version_id)
+    except (Document.DoesNotExist, DocumentVersion.DoesNotExist):
+        return Response({"detail": "Document or version not found."}, status=404)
+    
+    # Check if user has permission to view document
+    if document.created_by != request.user:
+        access = document.access_permissions.filter(
+            user=request.user,
+            permission__in=['read', 'write', 'admin']
+        ).first()
+        if not access:
+            return Response({"detail": "You do not have permission to view this document."}, status=403)
+    
+    if not version.file:
+        return Response({"detail": "No file associated with this version."}, status=404)
+    
+    # Log download
+    AuditLog.log_activity(
+        user=request.user,
+        action="download",
+        resource_type="document_version",
+        resource_id=str(version.id),
+        resource_name=f"{document.title} v{version.version_number}",
+        details={
+            "document_id": str(document.id),
+            "version_number": version.version_number
+        },
+        content_object=version,
+        request=request,
+    )
+    
+    # Return file download response
+    from django.http import HttpResponse
+    from django.utils.encoding import smart_str
+    import mimetypes
+    
+    response = HttpResponse(version.file.read(), content_type=mimetypes.guess_type(version.file.name)[0])
+    response['Content-Disposition'] = f'attachment; filename="{smart_str(version.file.name.split("/")[-1])}"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_document_metadata_for_version(request, pk):
+    """Get current document metadata for creating a new version"""
+    try:
+        document = Document.objects.get(pk=pk)
+    except Document.DoesNotExist:
+        return Response({"detail": "Document not found."}, status=404)
+    
+    # Check if user has permission to edit document
+    if document.created_by != request.user:
+        access = document.access_permissions.filter(
+            user=request.user,
+            permission__in=['write', 'admin']
+        ).first()
+        if not access:
+            return Response({"detail": "You do not have permission to edit this document."}, status=403)
+    
+    # Return current document metadata
+    return Response({
+        'title': document.title,
+        'description': document.description,
+        'tags': TagSerializer(document.tags.all(), many=True).data,
+        'current_version': document.current_version.version_number if document.current_version else 0
+    })
