@@ -382,12 +382,12 @@ export default function DocumentListPage() {
 
             {/* Created By */}
             {showMode === 'all' && (
-              <div className="min-w-[140px] flex-1">
+              <div className="min-w-[140px] flex-1 relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
                 <select
                   value={filters.created_by}
                   onChange={(e) => handleFilterChange('created_by', e.target.value)}
-                  className="w-full px-3 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                  className="w-full appearance-none px-3 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
                 >
                   <option value="">All Users</option>
                   {usersDropdown.map((user) => (
@@ -398,22 +398,52 @@ export default function DocumentListPage() {
                     </option>
                   ))}
                 </select>
+
+                {/* Custom dropdown arrow */}
+                <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center justify-end top-1/3">
+                  <svg
+                    className="w-3 h-3 text-gray-400"
+                    fill="none"
+                    stroke="black"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
             )}
 
+
             {/* Status */}
-            <div className="min-w-[120px] flex-1">
+            <div className="relative min-w-[120px] flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+
               <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full px-3 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                className="w-full appearance-none px-3 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
               >
                 <option value="">All Status</option>
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
               </select>
+              {/* Custom dropdown arrow */}
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center justify-end top-1/3">
+                <svg
+                  className="h-3 w-3 text-gray-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="black" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
             </div>
+
 
             {/* Date Range */}
             <div className="relative min-w-[255px] flex-1">
@@ -460,7 +490,7 @@ export default function DocumentListPage() {
               </button>
             </div>
           </div>
-            
+
           {/* Tag Filters */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Tags</label>
