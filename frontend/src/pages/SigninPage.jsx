@@ -22,6 +22,53 @@ const signinUser = async (userData) => {
   }
 };
 
+const getErrorMessage = (error) => {
+  // Handle different types of errors
+  if (error.response?.status === 400) {
+    // Bad request - likely validation errors
+    if (error.response?.data?.non_field_errors?.length > 0) {
+      return error.response.data.non_field_errors[0];
+    }
+    if (error.response?.data?.message) {
+      return error.response.data.message;
+    }
+    if (error.response?.data?.detail) {
+      return error.response.data.detail;
+    }
+    // Check for field-specific errors
+    if (error.response?.data?.email?.length > 0) {
+      return error.response.data.email[0];
+    }
+    if (error.response?.data?.password?.length > 0) {
+      return error.response.data.password[0];
+    }
+    return 'Invalid email or password. Please check your credentials.';
+  }
+  
+  if (error.response?.status === 401) {
+    return 'Invalid email or password. Please check your credentials.';
+  }
+  
+  if (error.response?.status === 403) {
+    return 'Account access denied. Please contact support.';
+  }
+  
+  if (error.response?.status === 429) {
+    return 'Too many login attempts. Please try again later.';
+  }
+  
+  if (error.response?.status >= 500) {
+    return 'Server error. Please try again later.';
+  }
+  
+  if (error.message?.includes('Network Error')) {
+    return 'Network error. Please check your connection and try again.';
+  }
+  
+  // Default fallback
+  return 'Sign in failed. Please try again.';
+};
+
 function SigninPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +82,7 @@ function SigninPage() {
       // Check if MFA is required
       if (data.requires_mfa) {
         // Store temp data for MFA verification
-        localStorage.setItem('temp_user_id', data.user_id);
+        localStorage.setItem('mfa_user_id', data.user_id);
         navigate('/mfa');
       } else if (data.tokens && data.tokens.access) {
         // Normal login flow
@@ -77,26 +124,13 @@ function SigninPage() {
 
         {/* Auth Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* Tab Navigation */}
-          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
-            <div className="flex-1 text-center py-2 px-4 bg-blue-600 text-white rounded-md text-sm font-medium">
-              Sign In
-            </div>
-            <Link
-              to="/signup"
-              className="flex-1 text-center py-2 px-4 text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors"
-            >
-              Sign Up
-            </Link>
-          </div>
-
-          {/* Error Message */}
+        {/* Error Message */}
           {mutation.isError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
               <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              {mutation.error.response?.data?.message || mutation.error.message || 'Sign in failed. Please try again.'}
+              {getErrorMessage(mutation.error)}
             </div>
           )}
 
