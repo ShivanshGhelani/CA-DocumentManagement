@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { usersAPI } from '../services/api';
+import DateRangePicker from '../components/DateRangePicker.jsx';
+// import { useRef, useState } from 'react';
 
 // Debounce hook
 function useDebounce(value, delay) {
@@ -48,6 +50,28 @@ export default function DocumentListPage() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [showMode, setShowMode] = useState('all'); // 'all' or 'mine'
+  const [dateRange, setDateRange] = useState({ from: null, to: null });
+  const [dateRangePopoverOpen, setDateRangePopoverOpen] = useState(false);
+  const [selectedRange, setSelectedRange] = useState({ start: null, end: null });
+  const dateRangeButtonRef = useRef();
+  const dateRangePopoverRef = useRef();
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!dateRangePopoverOpen) return;
+    function handleClickOutside(event) {
+      if (
+        dateRangePopoverRef.current &&
+        !dateRangePopoverRef.current.contains(event.target) &&
+        dateRangeButtonRef.current &&
+        !dateRangeButtonRef.current.contains(event.target)
+      ) {
+        setDateRangePopoverOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dateRangePopoverOpen]);
 
   // Remove useQuery for documents, only use localStorage for caching and filtering
   // const { data: documentsData, isLoading: documentsDataumentsLoading, error } = useQuery({
@@ -228,10 +252,10 @@ export default function DocumentListPage() {
       }
 
       // 5. Date range filters
-      if (filters.created_date_from && new Date(doc.created_at) < new Date(filters.created_date_from)) {
+      if (dateRange.from && new Date(doc.created_at) < new Date(dateRange.from)) {
         return false;
       }
-      if (filters.created_date_to && new Date(doc.created_at) > new Date(filters.created_date_to)) {
+      if (dateRange.to && new Date(doc.created_at) > new Date(dateRange.to)) {
         return false;
       }
 
@@ -302,6 +326,7 @@ export default function DocumentListPage() {
     });
     setSearchInput('');
     setSelectedTags([]);
+    setSelectedRange({ start: null, end: null }); // <-- clear the date range picker
   };
 
   // Update filters when toggling All/My documents
@@ -342,155 +367,136 @@ export default function DocumentListPage() {
 
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-sm  border-t border-blue-600 p-6 mb-6">
-          <div className="space-y-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search documents by title, content, or description..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Filters Row */}
-            <div className={`grid grid-cols-1 md:grid-cols-2 ${showMode === 'all' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
-              {/* Created By Filter - Only show in 'all' mode */}
-              {showMode === 'all' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Created By</label>
-                  <select
-                    value={filters.created_by}
-                    onChange={(e) => handleFilterChange('created_by', e.target.value)}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Users</option>
-                    {usersDropdown.map((user) => (
-                      <option key={user.id} value={String(user.id)}>
-                        {user.first_name || user.last_name
-                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                          : user.email || user.username || `User ${user.id}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+        <div className="bg-white rounded-lg shadow-sm border-t border-blue-600 p-4 mb-4">
+          {/* Main Filters Row */}
+          <div className="flex flex-col md:flex-row md:items-end gap-y-2 gap-x-4 w-full">
+            {/* Created By Filter - Only show in 'all' mode */}
+            {showMode === 'all' && (
+              <div className="max-w-xs w-full">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Created By</label>
                 <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="flex justify-around w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.created_by}
+                  onChange={(e) => handleFilterChange('created_by', e.target.value)}
+                  className="block w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  <option value="">All Status</option>
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
+                  <option value="">All Users</option>
+                  {usersDropdown.map((user) => (
+                    <option key={user.id} value={String(user.id)}>
+                      {user.first_name || user.last_name
+                        ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                        : user.email || user.username || `User ${user.id}`}
+                    </option>
+                  ))}
                 </select>
               </div>
-
-              {/* Date From */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Created From</label>
-                <input
-                  type="date"
-                  value={filters.created_date_from}
-                  onChange={(e) => handleFilterChange('created_date_from', e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Date To */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Created To</label>
-                <input
-                  type="date"
-                  value={filters.created_date_to}
-                  onChange={(e) => handleFilterChange('created_date_to', e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            )}
+            {/* Status Filter */}
+            <div className="max-w-xs w-full">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="block w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
             </div>
-
-            {/* Tags Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Tags</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {tagsArray.length > 0 ? (
-                  tagsArray
-                    .filter(tag => {
-                      if (!currentUser || !tag.created_by) return false;
-
-                      const tagOwner = tag.created_by;
-
-                      if (showMode === 'mine') {
-                        return tagOwner.email === currentUser.email;
-                      } else if (showMode === 'all') {
-                        return tagOwner.email !== currentUser.email;
-                      }
-                      return true;
-                    })
-                    .map((tag) => (
-                      <button
-                        key={tag.id}
-                        onClick={() => handleTagSelect(tag)}
-                        disabled={selectedTags.find(t => t.id === tag.id)}
-                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${selectedTags.find(t => t.id === tag.id)
-                          ? 'bg-blue-100 text-blue-800 border-blue-300 cursor-not-allowed'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                          }`}
-                      >
-                        {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
-                      </button>
-                    ))
-                ) : (
-                  <span className="text-gray-400 text-sm">No tags available</span>
-                )}
-              </div>
-
-              {/* Selected Tags */}
-              {selectedTags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {selectedTags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
-                    >
-                      {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
-                      <button
-                        onClick={() => handleTagRemove(tag.id)}
-                        className="ml-2 text-blue-600 hover:text-blue-800"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
+            {/* Date Range */}
+            <div className="max-w-xs w-full relative">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Created Date Range</label>
+              <button
+                ref={dateRangeButtonRef}
+                type="button"
+                className="block w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-left text-sm"
+                onClick={() => setDateRangePopoverOpen(true)}
+              >
+                {selectedRange.start && selectedRange.end
+                  ? `${selectedRange.start.getDate().toString().padStart(2, '0')}/${(selectedRange.start.getMonth()+1).toString().padStart(2, '0')}/${selectedRange.start.getFullYear()} - ${selectedRange.end.getDate().toString().padStart(2, '0')}/${(selectedRange.end.getMonth()+1).toString().padStart(2, '0')}/${selectedRange.end.getFullYear()}`
+                  : 'Select date range'}
+              </button>
+              {dateRangePopoverOpen && (
+                <div ref={dateRangePopoverRef} className="absolute z-50 mt-1 left-0" style={{ minWidth: '220px' }}>
+                  <DateRangePicker
+                    onRangeSelected={(range) => {
+                      setSelectedRange(range);
+                      setDateRangePopoverOpen(false);
+                      setFilters((prev) => ({
+                        ...prev,
+                        created_date_from: range.start ? range.start.toISOString().slice(0, 10) : '',
+                        created_date_to: range.end ? range.end.toISOString().slice(0, 10) : '',
+                      }));
+                    }}
+                    onClose={() => setDateRangePopoverOpen(false)}
+                  />
                 </div>
               )}
             </div>
-
-
             {/* Clear Filters Button */}
-            <div className="flex justify-end">
+            <div className="flex-shrink-0 flex items-end md:ml-auto">
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium"
+                className="px-3 py-1 text-gray-600 hover:text-gray-800 text-sm font-medium border border-gray-200 rounded-md bg-white"
               >
                 Clear All Filters
               </button>
             </div>
+          </div>
+          {/* Tags Filter Row */}
+          <div className="mt-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Filter by Tags</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {tagsArray.length > 0 ? (
+                tagsArray
+                  .filter(tag => {
+                    if (!currentUser || !tag.created_by) return false;
+                    const tagOwner = tag.created_by;
+                    if (showMode === 'mine') {
+                      return tagOwner.email === currentUser.email;
+                    } else if (showMode === 'all') {
+                      return tagOwner.email !== currentUser.email;
+                    }
+                    return true;
+                  })
+                  .map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => handleTagSelect(tag)}
+                      disabled={selectedTags.find(t => t.id === tag.id)}
+                      className={`px-3 py-1 rounded-full text-xs border transition-colors ${selectedTags.find(t => t.id === tag.id)
+                        ? 'bg-blue-100 text-blue-800 border-blue-300 cursor-not-allowed'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                      {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
+                    </button>
+                  ))
+              ) : (
+                <span className="text-gray-400 text-xs">No tags available</span>
+              )}
+            </div>
+            {/* Selected Tags */}
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedTags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
+                  >
+                    {tag.display_name || (tag.value ? `${tag.key}: ${tag.value}` : tag.key)}
+                    <button
+                      onClick={() => handleTagRemove(tag.id)}
+                      className="ml-2 text-blue-600 hover:text-blue-800"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         {/* All/My documents Toggle Buttons */}

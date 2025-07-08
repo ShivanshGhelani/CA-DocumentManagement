@@ -1,6 +1,8 @@
 {
   "dependencies": {
+    "date-fns": "^4.1.0",
     "mammoth": "^1.9.1",
+    "react-day-picker": "^9.8.0",
     "react-pdf": "^10.0.1"
   }
 }
