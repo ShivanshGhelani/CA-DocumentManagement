@@ -6,35 +6,34 @@ from django.utils import timezone
 from django.utils.text import slugify
 import uuid
 import os
+import shortuuid
 
 User = get_user_model()
 
 def document_upload_path(instance, filename):
     """
-    Upload path for original file: 
-    documents/{username}/{document_id}_{slug_title}/original/{uuid}.{ext}
+    Upload path for original file:
+    documents/{user_email}/{short_id}/original/{uuid}.{ext}
     """
     ext = filename.split('.')[-1]
     unique_filename = f"{uuid.uuid4()}.{ext}"
 
-    username = str(instance.created_by.username).replace(" ", "_")
-    slug_title = slugify(instance.title)
-    document_folder = f"{instance.id}_{slug_title}"
+    user_email = str(instance.created_by.email).replace("@", "_at_").replace(".", "_")
+    document_folder = f"{instance.short_id}"
 
-    return f"documents/{username}/{document_folder}/original/{unique_filename}"
+    return f"documents/{user_email}/{document_folder}/{unique_filename}"
 
 # New: versioned upload path for DocumentVersion
 
 def document_version_upload_path(instance, filename):
     """
     Upload path for versioned files:
-    documents/{username}/{document_id}_{slug_title}/versions/{version_number}/{filename}
+    documents/{user_email}/{short_id}/versions/{version_number}/{filename}
     """
-    username = str(instance.created_by.username).replace(" ", "_")
-    slug_title = slugify(instance.document.title)
-    document_folder = f"{instance.document.id}_{slug_title}"
+    user_email = str(instance.created_by.email).replace("@", "_at_").replace(".", "_")
+    document_folder = f"{instance.document.short_id}"
     version_number = str(getattr(instance, 'version_number', 'unknown'))  # fallback if not set
-    return f"documents/{username}/{document_folder}/versions/{version_number}/{filename}"
+    return f"documents/{user_email}/{document_folder}/versions/{version_number}/{filename}"
 
 
 
@@ -88,6 +87,7 @@ class Document(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    short_id = models.CharField(max_length=12, unique=True, editable=False, blank=True, help_text="Short, unique, human-friendly document ID")
     title = models.CharField(max_length=100)  # Updated max length to 100
     description = models.TextField(blank=True)
     content = models.TextField(blank=True, help_text="Document content (optional if file is provided)")
@@ -141,12 +141,35 @@ class Document(models.Model):
         self.save()
 
     def save(self, *args, **kwargs):
+        if not self.short_id:
+            # Get initials from full name, fallback to username/email
+            full_name = self.created_by.get_full_name()
+            if full_name:
+                initials = ''.join([part[0].upper() for part in full_name.split() if part])
+            else:
+                username = getattr(self.created_by, 'username', None)
+                if username:
+                    initials = ''.join([part[0].upper() for part in username.split() if part])
+                else:
+                    email = getattr(self.created_by, 'email', '')
+                    initials = ''.join([part[0].upper() for part in email.split('@')[0].split('.') if part])
+            # Find the highest existing doc number for this user
+            existing_ids = Document.objects.filter(created_by=self.created_by, short_id__startswith=initials + 'D').values_list('short_id', flat=True)
+            max_num = 0
+            for sid in existing_ids:
+                try:
+                    num = int(sid[len(initials)+1:])
+                    if num > max_num:
+                        max_num = num
+                except (ValueError, IndexError):
+                    continue
+            next_number = max_num + 1
+            self.short_id = f"{initials}D{next_number:03d}"
         if self.file:
             try:
                 self.file_size = self.file.size
                 self.file_type = self.file.name.split('.')[-1].lower()
             except FileNotFoundError:
-                # File is missing from storage (e.g., S3); handle gracefully
                 self.file_size = None
                 self.file_type = None
         super().save(*args, **kwargs)
