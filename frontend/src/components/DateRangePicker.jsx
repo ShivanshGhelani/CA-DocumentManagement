@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const CalendarDateRangePicker = ({ onRangeSelected, onClose }) => {
+const CalendarDateRangePicker = ({ onRangeSelected, onClose, value, popoverOpen }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedRange, setSelectedRange] = useState({ start: null, end: null });
   const [hoverDate, setHoverDate] = useState(null);
+
+  // Debug: log when picker is rendered
+  useEffect(() => {
+    console.log('DateRangePicker rendered, popoverOpen:', popoverOpen, 'value:', value);
+  }, [popoverOpen, value]);
+
+  // Sync selectedRange with value prop and popover open state
+  useEffect(() => {
+    if (popoverOpen && value && (
+      !selectedRange.start ||
+      !selectedRange.end ||
+      value.start?.getTime() !== selectedRange.start?.getTime() ||
+      value.end?.getTime() !== selectedRange.end?.getTime()
+    )) {
+      setSelectedRange(value);
+      if (value.start) setCurrentDate(new Date(value.start));
+      console.log('DateRangePicker useEffect: syncing selectedRange with value');
+    }
+  }, [value, popoverOpen]);
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -77,13 +96,13 @@ const CalendarDateRangePicker = ({ onRangeSelected, onClose }) => {
     }
   };
 
-  // When both dates are selected, call onRangeSelected and onClose
+  // When both dates are selected, call onRangeSelected (but do not close automatically)
   useEffect(() => {
     if (selectedRange.start && selectedRange.end) {
       if (onRangeSelected) onRangeSelected(selectedRange);
-      if (onClose) onClose();
+      // Do not call onClose() here; let parent control closing
     }
-  }, [selectedRange, onRangeSelected, onClose]);
+  }, [selectedRange, onRangeSelected]);
 
   const isDateInRange = (date) => {
     if (!selectedRange.start || !selectedRange.end) return false;
