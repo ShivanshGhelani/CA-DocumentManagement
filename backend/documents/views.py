@@ -574,20 +574,24 @@ def document_rollback(request, pk):
     except DocumentVersion.DoesNotExist:
         return Response({"detail": "Version not found."}, status=404)
 
+    # Get next version number
+    next_version = document.versions.count() + 1
+    
     # Save current state as a new version before rollback
     DocumentVersion.objects.create(
         document=document,
-        version_number=document.version,
+        version_number=next_version,
         file=document.file,
         file_size=document.file_size or 0,
-        changes_description=f"Backup before rollback (v{document.version})",
+        title=document.title,
+        description=document.description,
+        changes_description=f"Backup before rollback (v{next_version})",
         created_by=request.user,
     )
 
     # Rollback file
-    document.file = version.file
-    document.file_size = version.file_size
-    document.version += 1
+    document.current_version = version
+    document.save()
 
     # Optionally, rollback content, title, description, status, tags, etc. (customize as needed)
     # For now, just rollback file and tags
@@ -632,21 +636,23 @@ def upload_document_version(request, pk):
     if 'file' not in request.FILES:
         return Response({"detail": "No file uploaded."}, status=400)
     new_file = request.FILES['file']
+    # Get next version number  
+    next_version = document.versions.count() + 1
+    
     reason = request.data.get('reason', '')
-    # Save current file as a version
-    DocumentVersion.objects.create(
+    # Create new version
+    new_version = DocumentVersion.objects.create(
         document=document,
-        version_number=document.version,
-        file=document.file,
-        file_size=document.file_size or 0,
-        changes_description=f"Version {document.version} backup before upload",
+        version_number=next_version,
+        file=new_file,
+        title=document.title,
+        description=document.description,
+        changes_description=f"Version {next_version}",
         reason=reason,
         created_by=request.user,
     )
-    # Update document with new file
-    document.file = new_file
-    document.file_size = new_file.size
-    document.version += 1
+    # Update document to point to new version
+    document.current_version = new_version
     document.save()
     # Sync S3 tags
     tags_dict = {tag.key: tag.value for tag in document.tags.all()}

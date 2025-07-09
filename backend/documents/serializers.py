@@ -343,10 +343,11 @@ class DocumentVersionCreateSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         inherit_metadata = validated_data.pop('inherit_metadata', True)
         tag_ids = validated_data.pop('tag_ids', None)
+        file = validated_data.pop('file')
         
         # Create new version using the document's method
         result = document.create_new_version(
-            file=validated_data['file'],
+            file=file,
             user=user,
             inherit_metadata=inherit_metadata,
             **validated_data

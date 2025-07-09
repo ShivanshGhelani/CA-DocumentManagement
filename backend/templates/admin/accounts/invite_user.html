@@ -1,0 +1,115 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}Invite User | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:accounts_user_changelist' %}">Users</a>
+&rsaquo; {% trans 'Invite User' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        <div class="form-row">
+            <h1>Invite New User</h1>
+            <p>Invite a new user to the Document Management System. They will receive an email with login credentials.</p>
+        </div>
+        
+        {% if form.non_field_errors %}
+            <div class="form-row">
+                <div class="errors">
+                    {{ form.non_field_errors }}
+                </div>
+            </div>
+        {% endif %}
+        
+        <fieldset class="module aligned">
+            <div class="form-row{% if form.email.errors %} errors{% endif %}">
+                <div>
+                    {{ form.email.label_tag }}
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.email.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if form.email.help_text %}
+                        <div class="help">{{ form.email.help_text }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-row{% if form.first_name.errors %} errors{% endif %}">
+                <div>
+                    {{ form.first_name.label_tag }}
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.first_name.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-row{% if form.last_name.errors %} errors{% endif %}">
+                <div>
+                    {{ form.last_name.label_tag }}
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.last_name.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-row{% if form.job_title.errors %} errors{% endif %}">
+                <div>
+                    {{ form.job_title.label_tag }}
+                    {{ form.job_title }}
+                    {% if form.job_title.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.job_title.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-row{% if form.send_email.errors %} errors{% endif %}">
+                <div>
+                    {{ form.send_email }} {{ form.send_email.label_tag }}
+                    {% if form.send_email.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.send_email.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if form.send_email.help_text %}
+                        <div class="help">{{ form.send_email.help_text }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </fieldset>
+        
+        <div class="submit-row">
+            <input type="submit" value="Invite User" class="default" />
+            <a href="{% url 'admin:accounts_user_changelist' %}" class="button cancel-link">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

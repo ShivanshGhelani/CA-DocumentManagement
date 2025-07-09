@@ -1,0 +1,111 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block title %}Storage Usage Report | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:accounts_user_changelist' %}">Users</a>
+&rsaquo; {% trans 'Storage Report' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Storage Usage Report</h1>
+    
+    <div class="module">
+        <h2>Summary</h2>
+        <div class="form-row">
+            <p><strong>Total Active Users:</strong> {{ total_users }}</p>
+            <p><strong>Total Storage Used:</strong> 
+                {% if total_storage %}
+                    {{ total_storage|filesizeformat }}
+                {% else %}
+                    0 bytes
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    
+    <div class="module">
+        <h2>Per-User Storage Usage</h2>
+        
+        {% if users_storage %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Documents</th>
+                        <th>Storage Used</th>
+                        <th>Last Login</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users_storage %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'admin:accounts_user_change' user.pk %}">
+                                    {{ user.get_full_name|default:user.username }}
+                                </a>
+                            </td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.document_count|default:0 }}</td>
+                            <td>
+                                {% if user.total_storage %}
+                                    {{ user.total_storage|filesizeformat }}
+                                {% else %}
+                                    0 bytes
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.last_login %}
+                                    {{ user.last_login|date:"Y-m-d H:i" }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                    <span style="color: green;">Active</span>
+                                {% else %}
+                                    <span style="color: red;">Inactive</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No users found.</p>
+        {% endif %}
+    </div>
+    
+    <div class="submit-row">
+        <a href="{% url 'admin:accounts_user_changelist' %}" class="button">Back to Users</a>
+    </div>
+</div>
+
+<style>
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+table th, table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+</style>
+{% endblock %}

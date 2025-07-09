@@ -1,0 +1,21 @@
+Subject: Invitation to Document Management System
+
+Hello{% if user.first_name %} {{ user.first_name }}{% endif %},
+
+You have been invited to join our Document Management System by {{ admin_user.get_full_name|default:admin_user.email }}.
+
+Your account details:
+- Email: {{ user.email }}
+- Temporary Password: {{ temp_password }}
+
+Please visit {{ site_url }} to log in and change your password.
+
+For your security, we recommend:
+1. Log in as soon as possible
+2. Change your password immediately after logging in
+3. Enable two-factor authentication for additional security
+
+Welcome to the team!
+
+Best regards,
+Document Management System Team
