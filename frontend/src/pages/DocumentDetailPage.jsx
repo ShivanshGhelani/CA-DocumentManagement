@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/axios';
+import { auditAPI } from '../services/api';
 import mammoth from 'mammoth';
 import VersionHistoryModal from '../components/VersionHistoryModal';
 import NewVersionModal from '../components/NewVersionModal';
@@ -286,6 +287,16 @@ export default function DocumentDetailPage() {
     queryFn: () => fetchDocumentVersions(id),
     enabled: showVersions
   });
+
+  // Fetch audit logs for this document
+  const { data: auditLogs } = useQuery({
+    queryKey: ['document-audit', id],
+    queryFn: () => auditAPI.getAuditLogs({ 
+      resource_type: 'document',
+      resource_id: id 
+    }),
+    enabled: !!id
+  });
   const deleteMutation = useMutation({
     mutationFn: deleteDocument,
     onSuccess: () => {
@@ -513,52 +524,6 @@ export default function DocumentDetailPage() {
                   </svg>
                   View Document
                 </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleDownload}
-                    className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                    title="Download"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </button>
-                  
-                  {/* Only show version management buttons if current user is the document owner */}
-                  {isOwner && (
-                    <>
-                      {/* Version History Button */}
-                      <button
-                        onClick={() => setShowVersionHistoryModal(true)}
-                        className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                        title="Version History"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                      
-                      <button
-                        onClick={() => setShowNewVersionModal(true)}
-                        className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                        title="Upload New Version"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => navigate(`/documents/${id}/edit`)}
-                        className="inline-flex items-center justify-center px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl font-medium transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                        title="Edit"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -690,32 +655,71 @@ export default function DocumentDetailPage() {
                     <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-3">
                       <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17a2 2 0 104 0 2 2 0 00-4 0zm-7-6a2 2 0 104 0 2 2 0 00-4 0zm14 2a2 2 0 100-4 2 2 0 000 4zm-7 6v-4m0 0V7m0 6H7m4 0h4" />
-                    </svg>
+                      </svg>
                       Recent Activity
                     </h3>
                     <div className="space-y-4">
-                      <div className="flex items-start space-x-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/60 hover:shadow-md transition-all">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shadow-sm">
-                          <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                      {auditLogs?.results?.length > 0 ? (
+                        auditLogs.results.slice(0, 10).map((log) => {
+                          const getActivityIcon = (action) => {
+                            switch (action) {
+                              case 'create':
+                                return { icon: 'M12 4v16m8-8H4', bgColor: 'bg-green-100', textColor: 'text-green-600' };
+                              case 'update':
+                                return { icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', bgColor: 'bg-blue-100', textColor: 'text-blue-600' };
+                              case 'download':
+                                return { icon: 'M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600' };
+                              case 'rollback':
+                                return { icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6', bgColor: 'bg-yellow-100', textColor: 'text-yellow-600' };
+                              default:
+                                return { icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', bgColor: 'bg-gray-100', textColor: 'text-gray-600' };
+                            }
+                          };
+
+                          const getActivityMessage = (log) => {
+                            const version = log.details?.version_number || 'unknown';
+                            switch (log.action) {
+                              case 'create':
+                                if (log.resource_type === 'document_version') {
+                                  return `Document updated to new version ${version}`;
+                                }
+                                return `Document created`;
+                              case 'rollback':
+                                return `Document rolled back to version ${version}`;
+                              case 'download':
+                                return 'Document downloaded';
+                              default:
+                                return log.resource_name || `${log.action} ${log.resource_type}`;
+                            }
+                          };
+
+                          const activity = getActivityIcon(log.action);
+                          
+                          return (
+                            <div key={log.id} className="flex items-start space-x-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/60 hover:shadow-md transition-all">
+                              <div className={`w-10 h-10 ${activity.bgColor} rounded-full flex items-center justify-center shadow-sm`}>
+                                <svg className={`w-5 h-5 ${activity.textColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={activity.icon} />
+                                </svg>
+                              </div>
+                              <div>
+                                <p className="text-slate-900 font-semibold">{getActivityMessage(log)}</p>
+                                <p className="text-slate-500 text-sm">{new Date(log.timestamp).toLocaleString()}</p>
+                                {log.user && (
+                                  <p className="text-slate-400 text-xs">by {log.user.email}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
+                          <p>No activity recorded yet</p>
                         </div>
-                        <div>
-                          <p className="text-slate-900 font-semibold">Document updated to version {document.version}</p>
-                          <p className="text-slate-500 text-sm">{new Date(document.updated_at).toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start space-x-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/60 hover:shadow-md transition-all">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center shadow-sm">
-                          <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-slate-900 font-semibold">Document published</p>
-                          <p className="text-slate-500 text-sm">{new Date(document.created_at).toLocaleString()}</p>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -734,23 +738,70 @@ export default function DocumentDetailPage() {
                 Quick Actions
               </h3>
               <div className="space-y-3">
-                {/* Only show version history and delete for document owners */}
+                {/* Download button - always visible */}
+                <button
+                  onClick={handleDownload}
+                  className="w-full flex items-center justify-between p-4 bg-blue-50/70 hover:bg-blue-100/70 rounded-xl transition-all text-left text-blue-700 group border border-blue-200/50 hover:shadow-md"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="font-semibold">Download</span>
+                  </div>
+                  <svg className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                {/* Owner-only actions */}
                 {isOwner && (
                   <>
                     <button
-                      onClick={() => setShowVersions(true)}
-                      className="w-full flex items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/70 rounded-xl transition-all group border border-slate-200/50 hover:shadow-md"
+                      onClick={() => setShowVersionHistoryModal(true)}
+                      className="w-full flex items-center justify-between p-4 bg-purple-50/70 hover:bg-purple-100/70 rounded-xl transition-all text-left text-purple-700 group border border-purple-200/50 hover:shadow-md"
                     >
                       <div className="flex items-center">
-                        <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="font-semibold text-slate-900">Version History</span>
+                        <span className="font-semibold">Version History</span>
                       </div>
-                      <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-purple-400 group-hover:text-purple-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
+
+                    <button
+                      onClick={() => setShowNewVersionModal(true)}
+                      className="w-full flex items-center justify-between p-4 bg-green-50/70 hover:bg-green-100/70 rounded-xl transition-all text-left text-green-700 group border border-green-200/50 hover:shadow-md"
+                    >
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span className="font-semibold">Upload New Version</span>
+                      </div>
+                      <svg className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+
+                    <button
+                      onClick={() => navigate(`/documents/${id}/edit`)}
+                      className="w-full flex items-center justify-between p-4 bg-amber-50/70 hover:bg-amber-100/70 rounded-xl transition-all text-left text-amber-700 group border border-amber-200/50 hover:shadow-md"
+                    >
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span className="font-semibold">Edit Document</span>
+                      </div>
+                      <svg className="w-4 h-4 text-amber-400 group-hover:text-amber-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+
                     <button
                       onClick={handleDeleteClick}
                       className="w-full flex items-center justify-between p-4 bg-red-50/70 hover:bg-red-100/70 rounded-xl transition-all text-left text-red-700 group border border-red-200/50 hover:shadow-md"
@@ -767,6 +818,7 @@ export default function DocumentDetailPage() {
                     </button>
                   </>
                 )}
+                
                 {/* Show basic info for non-owners */}
                 {!isOwner && (
                   <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/50">

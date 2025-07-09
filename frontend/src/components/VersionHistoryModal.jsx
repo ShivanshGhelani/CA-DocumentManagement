@@ -19,6 +19,7 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['document', document.id] });
+      queryClient.invalidateQueries({ queryKey: ['document-audit', document.id] });
       onClose();
     },
     onError: (error) => {

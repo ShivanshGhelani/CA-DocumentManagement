@@ -141,6 +141,7 @@ def get_task_result(request, task_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 urlpatterns = [
+    path("", include("admin_index.urls")),  # Root path for admin index
     path("admin/", admin.site.urls),
     path("api/auth/", include("accounts.urls")),
     path("api/", include("documents.urls")),

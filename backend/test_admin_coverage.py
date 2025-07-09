@@ -31,19 +31,19 @@ class TestDocumentAdmin:
             created_by=self.user
         )
     
-    def test_document_title_display(self):
-        """Test document_title admin method"""
-        title_html = self.admin.document_title(self.document)
-        assert 'Test Document' in title_html
-        assert 'href=' in title_html  # Should be a link
+    def test_status_badge_display(self):
+        """Test status_badge admin method"""
+        badge_html = self.admin.status_badge(self.document)
+        assert 'DRAFT' in badge_html
+        assert 'background-color:' in badge_html  # Should have styling
     
-    def test_creator_display(self):
-        """Test creator admin method"""
-        creator_html = self.admin.creator(self.document)
-        assert 'test@example.com' in creator_html
+    def test_file_info_display(self):
+        """Test file_info admin method"""
+        file_info_html = self.admin.file_info(self.document)
+        assert 'No file' in file_info_html or 'Type:' in file_info_html
     
-    def test_version_count_display(self):
-        """Test version_count admin method"""
+    def test_versions_count_display(self):
+        """Test versions_count admin method"""
         # Create a version
         DocumentVersion.objects.create(
             document=self.document,
@@ -51,9 +51,35 @@ class TestDocumentAdmin:
             title='Version 1',
             created_by=self.user
         )
-        
-        count = self.admin.version_count(self.document)
-        assert count == 1
+        count_html = self.admin.versions_count(self.document)
+        assert '1 versions' in count_html
+        assert 'href=' in count_html  # Should be a link
+    
+    def test_storage_usage_display(self):
+        """Test storage_usage admin method"""
+        storage_html = self.admin.storage_usage(self.document)
+        assert 'B' in storage_html or 'KB' in storage_html or 'MB' in storage_html or 'GB' in storage_html
+    
+    def test_tags_display(self):
+        """Test tags_display admin method"""
+        # Create a tag and assign it
+        tag = Tag.objects.create(
+            key='test',
+            value='tag',
+            created_by=self.user
+        )
+        self.document.tags.add(tag)
+        tags_html = self.admin.tags_display(self.document)
+        assert 'test: tag' in tags_html
+        assert 'background-color:' in tags_html
+
+    def test_format_file_size(self):
+        """Test format_file_size method"""
+        # Test different file sizes
+        assert self.admin.format_file_size(512) == "512 B"
+        assert "KB" in self.admin.format_file_size(1024)
+        assert "MB" in self.admin.format_file_size(1024 * 1024)
+        assert "GB" in self.admin.format_file_size(1024 * 1024 * 1024)
     
     def test_current_version_display(self):
         """Test current_version_display admin method"""
@@ -77,9 +103,9 @@ class TestDocumentAdmin:
     
     def test_status_badge_display(self):
         """Test status_badge admin method"""
-        badge = self.admin.status_badge(self.document)
-        assert 'badge' in badge
-        assert self.document.status in badge
+        badge_html = self.admin.status_badge(self.document)
+        assert 'DRAFT' in badge_html
+        assert 'background-color:' in badge_html  # Should have styling
     
     def test_restore_documents_action(self):
         """Test restore_documents bulk action"""

@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 from django.utils import timezone
 import tempfile
 import os
-from .models import Document, DocumentVersion, DocumentShare, Category, Tag
+from .models import Document, DocumentVersion, Tag, DocumentAuditLog, DocumentAccess
 from .serializers import DocumentSerializer, DocumentVersionSerializer
 
 User = get_user_model()

@@ -706,6 +706,12 @@ def create_document_version(request, pk):
     if document.created_by != request.user:
         return Response({"detail": "Only the document owner can create new versions."}, status=403)
     
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[VERSION UPLOAD] Request data keys: {list(request.data.keys())}")
+    logger.info(f"[VERSION UPLOAD] Request data: {dict(request.data)}")
+    
     serializer = DocumentVersionCreateSerializer(
         data=request.data,
         context={'request': request, 'document': document}
@@ -740,6 +746,8 @@ def create_document_version(request, pk):
             status=status.HTTP_201_CREATED
         )
     
+    # Debug logging for validation errors
+    logger.error(f"[VERSION UPLOAD] Validation errors: {serializer.errors}")
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

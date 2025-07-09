@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #2d3748;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #718096;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+        
+        .admin-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 1rem 2.5rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            cursor: pointer;
+        }
+        
+        .admin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .features {
+            margin-top: 3rem;
+            text-align: left;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: #f8fafc;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature-icon {
+            margin-right: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .feature-text {
+            color: #4a5568;
+            font-weight: 500;
+        }
+        
+        .footer {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e2e8f0;
+            color: #a0aec0;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 2rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .logo {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📄</div>
+        <h1>Document Management System</h1>
+        <p class="subtitle">
+            Secure, organized, and efficient document management for your organization
+        </p>
+        
+        <a href="/admin/" class="admin-btn">
+            🔧 Access Admin Panel
+        </a>
+        
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">🔒</span>
+                <span class="feature-text">Secure document storage with user authentication</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">📋</span>
+                <span class="feature-text">Document versioning and audit trails</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">👥</span>
+                <span class="feature-text">User management and role-based access</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">📊</span>
+                <span class="feature-text">Storage analytics and reporting</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Document Management System v1.0</p>
+            <p>Built with Django & React</p>
+        </div>
+    </div>
+</body>
+</html>

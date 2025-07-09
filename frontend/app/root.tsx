@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -30,6 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Document Management</title>
         <Meta />
         <Links />
       </head>
@@ -42,10 +44,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Create a client (Should be defined outside the component to prevent re-creation on re-renders)
-const queryClient = new QueryClient();
-
+// Create a client using useState to ensure it's created fresh on each render
 export default function App() {
+  // Create QueryClient in useState to ensure it's consistent between SSR and client
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        // This ensures that data is not refetched on window focus in SSR
+        refetchOnWindowFocus: false,
+        // This will help with hydration mismatches
+        staleTime: 60 * 1000, // 1 minute
+      },
+    },
+  }));
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

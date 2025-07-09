@@ -283,9 +283,10 @@ class DocumentVersion(models.Model):
     # File information
     file = models.FileField(
         upload_to=document_version_upload_path,
-        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])]
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])],
+        blank=True, null=True
     )
-    file_size = models.PositiveIntegerField()
+    file_size = models.PositiveIntegerField(default=0)
     file_type = models.CharField(max_length=10, blank=True)
     
     # Version metadata
@@ -311,6 +312,13 @@ class DocumentVersion(models.Model):
             except:
                 self.file_size = 0
                 self.file_type = ''
+        else:
+            # Set defaults for versions without files
+            if not self.file_size:
+                self.file_size = 0
+            if not self.file_type:
+                self.file_type = ''
+                
         if self.reason and not self.changes_description:
             self.changes_description = self.reason
         super().save(*args, **kwargs)

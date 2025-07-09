@@ -15,6 +15,7 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
   });
   const [selectedTags, setSelectedTags] = useState([]);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [tagValue, setTagValue] = useState('');
 
   // Get current document metadata
   const { data: currentMetadata } = useQuery({
@@ -36,6 +37,7 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['document', document.id] });
       queryClient.invalidateQueries({ queryKey: ['document-versions', document.id] });
+      queryClient.invalidateQueries({ queryKey: ['document-audit', document.id] });
       onClose();
       resetForm();
     },
@@ -67,6 +69,7 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
     });
     setSelectedTags([]);
     setTagSearchQuery('');
+    setTagValue('');
   };
 
   const handleSubmit = (e) => {
@@ -84,7 +87,10 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
     if (!inheritMetadata) {
       submitData.append('title', formData.title);
       submitData.append('description', formData.description);
-      submitData.append('tag_ids', JSON.stringify(selectedTags.map(tag => tag.id)));
+      // Send tag_ids as separate entries, not as JSON string
+      selectedTags.forEach(tag => {
+        submitData.append('tag_ids', tag.id);
+      });
     }
     
     submitData.append('changes_description', formData.changes_description);
@@ -98,10 +104,36 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
       setSelectedTags([...selectedTags, tag]);
     }
     setTagSearchQuery('');
+    setTagValue('');
   };
 
   const handleTagRemove = (tagId) => {
     setSelectedTags(selectedTags.filter(t => t.id !== tagId));
+  };
+
+  const handleAddNewTag = async () => {
+    if (!tagSearchQuery.trim()) return;
+    
+    try {
+      // Create new tag
+      const newTag = await tagsAPI.createTag({
+        key: tagSearchQuery.trim(),
+        value: tagValue.trim() || null
+      });
+      
+      // Add to selected tags
+      setSelectedTags([...selectedTags, newTag]);
+      
+      // Clear inputs
+      setTagSearchQuery('');
+      setTagValue('');
+      
+      // Refresh tags list
+      queryClient.invalidateQueries(['tags']);
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      alert('Failed to create tag. Please try again.');
+    }
   };
 
   const filteredTags = tagsData?.results?.filter(tag =>
@@ -207,50 +239,72 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
                 
                 {/* Selected Tags */}
                 {selectedTags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {selectedTags.map((tag) => (
                       <span
                         key={tag.id}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                        style={{ backgroundColor: tag.color + '20', color: tag.color }}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200"
                       >
-                        {tag.display_name}
+                        {tag.key}{tag.value ? `: ${tag.value}` : ''}
                         <button
                           type="button"
                           onClick={() => handleTagRemove(tag.id)}
-                          className="ml-1 text-gray-500 hover:text-gray-700"
+                          className="ml-1 text-blue-600 hover:text-blue-800"
                         >
-                          <X size={12} />
+                          <X size={14} />
                         </button>
                       </span>
                     ))}
                   </div>
                 )}
 
-                {/* Tag Search */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={tagSearchQuery}
-                    onChange={(e) => setTagSearchQuery(e.target.value)}
-                    placeholder="Search for tags..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
+                {/* Add New Tag */}
+                <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                  <div className="flex gap-2 mb-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={tagSearchQuery}
+                        onChange={(e) => setTagSearchQuery(e.target.value)}
+                        placeholder="Tag key (e.g., priority, status)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={tagValue}
+                        onChange={(e) => setTagValue(e.target.value)}
+                        placeholder="Tag value (optional)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddNewTag}
+                      disabled={!tagSearchQuery.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
                   
-                  {/* Tag Suggestions */}
+                  {/* Existing Tags Suggestions */}
                   {tagSearchQuery && filteredTags.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                      {filteredTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => handleTagSelect(tag)}
-                          className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <Tag size={14} style={{ color: tag.color }} />
-                          {tag.display_name}
-                        </button>
-                      ))}
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-600 mb-2">Or select from existing tags:</p>
+                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                        {filteredTags.slice(0, 6).map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => handleTagSelect(tag)}
+                            className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                          >
+                            {tag.key}{tag.value ? `: ${tag.value}` : ''}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

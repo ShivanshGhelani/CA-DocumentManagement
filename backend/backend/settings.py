@@ -50,8 +50,9 @@ INSTALLED_APPS = [
     
     # Local apps
     "accounts",
-    "documents",
+    "documents", 
     "audit",
+    "admin_index",
 ]
 
 MIDDLEWARE = [

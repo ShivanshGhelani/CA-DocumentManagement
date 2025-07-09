@@ -331,12 +331,24 @@ class DocumentVersionCreateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    title = serializers.CharField(required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = DocumentVersion
         fields = ('id', 'title', 'description', 'file', 'changes_description', 
                  'reason', 'inherit_metadata', 'tags', 'tag_ids')
         read_only_fields = ('id',)
+    
+    def validate(self, data):
+        """Custom validation to handle optional fields when inheriting metadata"""
+        inherit_metadata = data.get('inherit_metadata', True)
+        
+        # If not inheriting metadata, title is required
+        if not inherit_metadata and not data.get('title'):
+            raise serializers.ValidationError({'title': 'Title is required when not inheriting metadata.'})
+                
+        return data
     
     def create(self, validated_data):
         document = self.context['document']
