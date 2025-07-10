@@ -689,7 +689,11 @@ export default function DocumentDetailPage() {
                 {/* Upload New Version - visible to owner only */}
                 {isOwner && (
                   <button
-                    onClick={() => setShowNewVersionModal(true)}
+                    onClick={() => {
+                      // Refetch latest document data before opening modal
+                      queryClient.invalidateQueries({ queryKey: ['document', id] });
+                      setShowNewVersionModal(true);
+                    }}
                     className="w-full flex items-center justify-between p-4 bg-green-50/70 hover:bg-green-100/70 rounded-xl transition-all text-left text-green-700 group border border-green-200/50 hover:shadow-md"
                   >
                     <div className="flex items-center">

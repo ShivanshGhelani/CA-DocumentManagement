@@ -17,13 +17,15 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [tagValue, setTagValue] = useState('');
 
-  // Get current document with latest metadata
+  // Get current document with latest metadata - force fresh data
   const { data: currentDocument, isLoading: isLoadingDocument } = useQuery({
     queryKey: ['document', document?.id],
     queryFn: () => documentsAPI.getDocument(document.id),
     enabled: !!document?.id && isOpen,
     refetchOnMount: true,
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0  // Don't cache this query
   });
 
   // Get available tags
@@ -49,6 +51,13 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
     }
   });
 
+  // Force refetch when modal opens to ensure latest data
+  useEffect(() => {
+    if (isOpen && document?.id) {
+      queryClient.invalidateQueries({ queryKey: ['document', document.id] });
+    }
+  }, [isOpen, document?.id, queryClient]);
+
   // Initialize form with document data when modal opens
   useEffect(() => {
     if (isOpen && currentDocument) {
@@ -66,6 +75,7 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
   // Handle metadata inheritance toggle
   useEffect(() => {
     if (currentDocument) {
+      console.log('NewVersionModal: Current document tags:', currentDocument.tags);
       if (inheritMetadata) {
         // Restore current document metadata
         setFormData(prev => ({
@@ -74,6 +84,7 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
           description: currentDocument.description || ''
         }));
         setSelectedTags(currentDocument.tags || []);
+        console.log('NewVersionModal: Setting selected tags to:', currentDocument.tags);
       } else {
         // Clear metadata but keep changes_description and reason
         setFormData(prev => ({
@@ -82,6 +93,7 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
           description: ''
         }));
         setSelectedTags([]);
+        console.log('NewVersionModal: Clearing selected tags');
       }
     }
   }, [inheritMetadata, currentDocument]);
