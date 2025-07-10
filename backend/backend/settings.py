@@ -189,7 +189,7 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in development
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
-print("LOADED AWS KEY:", config("AWS_ACCESS_KEY_ID", default="NOT FOUND"))
+# print("LOADED AWS KEY:", config("AWS_ACCESS_KEY_ID", default="NOT FOUND"))
 
 AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='document-storage-bucket')

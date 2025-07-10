@@ -7,7 +7,6 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -44,20 +43,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Create a client using useState to ensure it's created fresh on each render
-export default function App() {
-  // Create QueryClient in useState to ensure it's consistent between SSR and client
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        // This ensures that data is not refetched on window focus in SSR
-        refetchOnWindowFocus: false,
-        // This will help with hydration mismatches
-        staleTime: 60 * 1000, // 1 minute
-      },
+// Create a singleton QueryClient outside of the component to avoid React hook issues
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // This ensures that data is not refetched on window focus in SSR
+      refetchOnWindowFocus: false,
+      // This will help with hydration mismatches
+      staleTime: 60 * 1000, // 1 minute
     },
-  }));
+  },
+});
 
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
