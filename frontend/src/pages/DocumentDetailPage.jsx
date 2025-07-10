@@ -733,24 +733,27 @@ export default function DocumentDetailPage() {
                   </svg>
                 </button>
 
+                {/* Upload New Version - visible to owner only */}
+                {isOwner && (
+                  <button
+                    onClick={() => setShowNewVersionModal(true)}
+                    className="w-full flex items-center justify-between p-4 bg-green-50/70 hover:bg-green-100/70 rounded-xl transition-all text-left text-green-700 group border border-green-200/50 hover:shadow-md"
+                  >
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="font-semibold">Upload New Version</span>
+                    </div>
+                    <svg className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+
                 {/* Owner-only actions */}
                 {isOwner && (
                   <>
-
-                    <button
-                      onClick={() => setShowNewVersionModal(true)}
-                      className="w-full flex items-center justify-between p-4 bg-green-50/70 hover:bg-green-100/70 rounded-xl transition-all text-left text-green-700 group border border-green-200/50 hover:shadow-md"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="font-semibold">Upload New Version</span>
-                      </div>
-                      <svg className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
 
                     <button
                       onClick={() => navigate(`/documents/${id}/edit`)}

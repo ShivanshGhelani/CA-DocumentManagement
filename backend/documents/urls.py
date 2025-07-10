@@ -24,4 +24,5 @@ urlpatterns = [    # Tags
     path('documents/<uuid:pk>/versions/<uuid:version_id>/delete/', views.delete_document_version, name='delete-document-version'),
     path('documents/<uuid:pk>/rollback/', views.rollback_document, name='rollback-document'),
     path('documents/<uuid:pk>/metadata/', views.get_document_metadata_for_version, name='get-document-metadata'),
+    path('sync-all-tags-to-s3/', views.sync_all_document_tags_to_s3, name='sync-all-tags-to-s3'),
 ]

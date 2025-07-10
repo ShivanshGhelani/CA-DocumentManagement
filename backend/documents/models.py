@@ -200,8 +200,11 @@ class Document(models.Model):
         
         # If inheriting metadata, copy from current document
         if inherit_metadata:
-            # Copy tags
-            new_version.tags.set(self.tags.all())
+            # Copy tags from current version if it exists, else from document
+            if self.current_version:
+                new_version.tags.set(self.current_version.tags.all())
+            else:
+                new_version.tags.set(self.tags.all())
             # Copy other metadata if not explicitly provided
             if 'title' not in metadata:
                 new_version.title = self.title

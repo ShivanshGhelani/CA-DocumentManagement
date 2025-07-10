@@ -186,9 +186,14 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied("You do not have permission to edit this document.")
         document = serializer.save()
         # --- S3 tag sync ---
-        tags_dict = {tag.key: tag.value for tag in document.tags.all()}
-        if document.file:
-            update_s3_object_tags(document.file.name, tags_dict)
+        # Always sync S3 tags if tag_ids are present in the request (i.e., tags changed)
+        tag_ids = self.request.data.getlist('tag_ids') or self.request.data.get('tag_ids')
+        if tag_ids is not None:
+            # Use tags from current_version if it exists, else from document
+            tags_qs = document.current_version.tags.all() if document.current_version else document.tags.all()
+            tags_dict = {tag.key: tag.value for tag in tags_qs}
+            if document.file:
+                update_s3_object_tags(document.file.name, tags_dict)
         # --- end S3 tag sync ---
         AuditLog.log_activity(
             user=user,
@@ -651,6 +656,12 @@ def upload_document_version(request, pk):
         reason=reason,
         created_by=request.user,
     )
+    # Inherit tags from current version if it exists, else from document
+    if document.current_version:
+        new_version.tags.set(document.current_version.tags.all())
+    else:
+        new_version.tags.set(document.tags.all())
+    new_version.save()
     # Update document to point to new version
     document.current_version = new_version
     document.save()
@@ -914,3 +925,27 @@ def delete_document_version(request, pk, version_id):
     )
     
     return Response({"message": "Version deleted successfully."}, status=204)
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAdminUser])
+def sync_all_document_tags_to_s3(request):
+    """Sync all document tags in the database to S3 for all documents with files."""
+    from s3_file_manager import update_s3_object_tags
+    updated = 0
+    failed = []
+    for doc in Document.objects.filter(file__isnull=False):
+        tags_dict = {tag.key: tag.value for tag in doc.tags.all()}
+        try:
+            ok = update_s3_object_tags(doc.file.name, tags_dict)
+            if ok:
+                updated += 1
+            else:
+                failed.append(doc.id)
+        except Exception as e:
+            failed.append(doc.id)
+    return Response({
+        "updated": updated,
+        "failed": failed,
+        "total": Document.objects.filter(file__isnull=False).count(),
+    })
