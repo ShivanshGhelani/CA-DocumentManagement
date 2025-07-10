@@ -8,20 +8,22 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
   const [file, setFile] = useState(null);
   const [inheritMetadata, setInheritMetadata] = useState(true);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
+    title: document?.title || '',
+    description: document?.description || '',
     changes_description: '',
     reason: ''
   });
-  const [selectedTags, setSelectedTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState(document?.tags || []);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [tagValue, setTagValue] = useState('');
 
-  // Get current document metadata
-  const { data: currentMetadata } = useQuery({
-    queryKey: ['document-metadata', document?.id],
-    queryFn: () => documentsAPI.getDocumentMetadata(document.id),
-    enabled: !!document?.id && isOpen
+  // Get current document with latest metadata
+  const { data: currentDocument, isLoading: isLoadingDocument } = useQuery({
+    queryKey: ['document', document?.id],
+    queryFn: () => documentsAPI.getDocument(document.id),
+    enabled: !!document?.id && isOpen,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
 
   // Get available tags
@@ -34,12 +36,10 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
   const createVersionMutation = useMutation({
     mutationFn: (data) => documentsAPI.createDocumentVersion(document.id, data),
     onSuccess: () => {
-      // Invalidate all related queries to ensure UI updates with new version details
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['document', document.id] });
       queryClient.invalidateQueries({ queryKey: ['document-versions', document.id] });
       queryClient.invalidateQueries({ queryKey: ['document-audit', document.id] });
-      queryClient.invalidateQueries({ queryKey: ['document-metadata', document.id] });
       onClose();
       resetForm();
     },
@@ -49,27 +49,52 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
     }
   });
 
+  // Initialize form with document data when modal opens
   useEffect(() => {
-    if (currentMetadata && inheritMetadata) {
-      setFormData(prev => ({
-        ...prev,
-        title: currentMetadata.title || '',
-        description: currentMetadata.description || ''
-      }));
-      setSelectedTags(currentMetadata.tags || []);
+    if (isOpen && currentDocument) {
+      if (inheritMetadata) {
+        setFormData(prev => ({
+          ...prev,
+          title: currentDocument.title || '',
+          description: currentDocument.description || ''
+        }));
+        setSelectedTags(currentDocument.tags || []);
+      }
     }
-  }, [currentMetadata, inheritMetadata]);
+  }, [currentDocument, isOpen, inheritMetadata]);
+
+  // Handle metadata inheritance toggle
+  useEffect(() => {
+    if (currentDocument) {
+      if (inheritMetadata) {
+        // Restore current document metadata
+        setFormData(prev => ({
+          ...prev,
+          title: currentDocument.title || '',
+          description: currentDocument.description || ''
+        }));
+        setSelectedTags(currentDocument.tags || []);
+      } else {
+        // Clear metadata but keep changes_description and reason
+        setFormData(prev => ({
+          ...prev,
+          title: '',
+          description: ''
+        }));
+        setSelectedTags([]);
+      }
+    }
+  }, [inheritMetadata, currentDocument]);
 
   const resetForm = () => {
     setFile(null);
     setInheritMetadata(true);
-    setFormData({
-      title: '',
-      description: '',
+    // Only reset the non-metadata fields
+    setFormData(prev => ({
+      ...prev,
       changes_description: '',
       reason: ''
-    });
-    setSelectedTags([]);
+    }));
     setTagSearchQuery('');
     setTagValue('');
   };
@@ -89,7 +114,6 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
     if (!inheritMetadata) {
       submitData.append('title', formData.title);
       submitData.append('description', formData.description);
-      // Send tag_ids as separate entries, not as JSON string
       selectedTags.forEach(tag => {
         submitData.append('tag_ids', tag.id);
       });

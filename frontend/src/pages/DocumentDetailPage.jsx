@@ -209,7 +209,7 @@ export default function DocumentDetailPage() {
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [pdfPageWidth, setPdfPageWidth] = useState(800);
   const pdfContainerRef = useRef(null);
-  
+
   // Version management state
   const [showVersionHistoryModal, setShowVersionHistoryModal] = useState(false);
   const [showNewVersionModal, setShowNewVersionModal] = useState(false);
@@ -276,9 +276,9 @@ export default function DocumentDetailPage() {
   // Fetch audit logs for this document
   const { data: auditLogs } = useQuery({
     queryKey: ['document-audit', id],
-    queryFn: () => auditAPI.getAuditLogs({ 
+    queryFn: () => auditAPI.getAuditLogs({
       resource_type: 'document',
-      resource_id: id 
+      resource_id: id
     }),
     enabled: !!id
   });
@@ -398,24 +398,6 @@ export default function DocumentDetailPage() {
         </div>
       )
     },
-    {
-      id: 'details',
-      label: 'Details',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      )
-    },
-    {
-      id: 'activity',
-      label: 'Activity',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17a2 2 0 104 0 2 2 0 00-4 0zm-7-6a2 2 0 104 0 2 2 0 00-4 0zm14 2a2 2 0 100-4 2 2 0 000 4zm-7 6v-4m0 0V7m0 6H7m4 0h4" />
-        </svg>
-      )
-    }
   ];
 
   return (
@@ -449,11 +431,6 @@ export default function DocumentDetailPage() {
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-3 leading-tight">
                       {document.title}
                     </h1>
-                    {document.description && (
-                      <p className="text-slate-600 text-lg lg:text-xl mb-6 leading-relaxed">
-                        {document.description}
-                      </p>
-                    )}
 
                     {/* Meta Info */}
                     <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500">
@@ -477,7 +454,30 @@ export default function DocumentDetailPage() {
                         </svg>
                         <span>{document.file_size ? formatFileSize(document.file_size) : '-'}</span>
                       </div>
-                      <StatusBadge status={document.status} />
+                      <div className="flex items-center gap-2">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          
+                        >
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <path d="M9 15h6" />
+                          <path d="M9 18h6" />
+                          <circle cx="12" cy="11" r="1" />
+                        </svg>
+                        <span>Version {document.version}.0</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={document.status} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -503,9 +503,9 @@ export default function DocumentDetailPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="flex flex-row flex-col-2 gap-5">
           {/* Main Content Area */}
-          <section className="lg:col-span-3">
+          <section className="lg:col-span-1 flex-2">
             {/* Tabs */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50">
               <div className="border-b border-slate-200/50">
@@ -536,59 +536,10 @@ export default function DocumentDetailPage() {
                       </svg>
                       Document Overview
                     </h3>
-                    <div className="bg-white shadow rounded-lg p-6 mb-6">
-                      <h2 className="text-lg font-semibold mb-4">Document Information</h2>
-                      {document && document.created_by ? (
-                        <>
-                          <p><strong>Title:</strong> {document.title}</p>
-                          <p><strong>Owner:</strong> {document.created_by.first_name} {document.created_by.last_name}</p>
-                          <p><strong>Created At:</strong> {new Date(document.created_at).toLocaleDateString()}</p>
-                          <p><strong>Last Modified:</strong> {new Date(document.updated_at).toLocaleDateString()}</p>
-                        </>
-                      ) : (
-                        <p>Loading document information...</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'details' && (
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-3">
-                      <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Document Details
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-slate-50/70 rounded-2xl p-6 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all">
-                        <label className="block text-sm font-semibold text-slate-500 mb-3">File Type</label>
-                        <div className="flex items-center gap-3">
-                          <FileTypeSVG fileType={document.file_type} className="w-8 h-8" />
-                          <p className="text-slate-900 font-semibold text-lg">{document.file_type}</p>
-                        </div>
-                      </div>
-                      <div className="bg-slate-50/70 rounded-2xl p-6 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all">
-                        <label className="block text-sm font-semibold text-slate-500 mb-3">File Size</label>
-                        <p className="text-slate-900 font-semibold text-lg flex items-center gap-2">
-                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {formatFileSize(document.file_size)}
-                        </p>
-                      </div>
-                      <div className="bg-slate-50/70 rounded-2xl p-6 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all">
-                        <label className="block text-sm font-semibold text-slate-500 mb-3">Version</label>
-                        <p className="text-slate-900 font-semibold text-lg flex items-center gap-2">
-                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          {document.version}
-                        </p>
-                      </div>
-                      <div className="bg-slate-50/70 rounded-2xl p-6 border border-slate-200/60 backdrop-blur-sm hover:shadow-md transition-all">
-                        <label className="block text-sm font-semibold text-slate-500 mb-3">Status</label>
-                        <StatusBadge status={document.status} />
+                    <div className="space-y-4">
+                      <span className="text-lg font-semibold text-slate-900">Description: </span>
+                      <span className="text-md text-black">{document.description}</span>
+                      <div className="flex items-center gap-4">
                       </div>
                     </div>
                     {document.tags && document.tags.length > 0 && (
@@ -606,8 +557,10 @@ export default function DocumentDetailPage() {
                   </div>
                 )}
 
-                {activeTab === 'activity' && (
-                  <div>
+
+
+                {activeTab === 'overview' && (
+                  <div className='hidden'>
                     <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-3">
                       <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17a2 2 0 104 0 2 2 0 00-4 0zm-7-6a2 2 0 104 0 2 2 0 00-4 0zm14 2a2 2 0 100-4 2 2 0 000 4zm-7 6v-4m0 0V7m0 6H7m4 0h4" />
@@ -626,55 +579,55 @@ export default function DocumentDetailPage() {
                           })
                           .slice(0, 10)
                           .map((log) => {
-                          const getActivityIcon = (action) => {
-                            switch (action) {
-                              case 'create':
-                                return { icon: 'M12 4v16m8-8H4', bgColor: 'bg-green-100', textColor: 'text-green-600' };
-                              case 'update':
-                                return { icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', bgColor: 'bg-blue-100', textColor: 'text-blue-600' };
-                              case 'download':
-                                return { icon: 'M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600' };
-                              case 'rollback':
-                                return { icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6', bgColor: 'bg-yellow-100', textColor: 'text-yellow-600' };
-                              default:
-                                return { icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', bgColor: 'bg-gray-100', textColor: 'text-gray-600' };
-                            }
-                          };
+                            const getActivityIcon = (action) => {
+                              switch (action) {
+                                case 'create':
+                                  return { icon: 'M12 4v16m8-8H4', bgColor: 'bg-green-100', textColor: 'text-green-600' };
+                                case 'update':
+                                  return { icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', bgColor: 'bg-blue-100', textColor: 'text-blue-600' };
+                                case 'download':
+                                  return { icon: 'M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600' };
+                                case 'rollback':
+                                  return { icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6', bgColor: 'bg-yellow-100', textColor: 'text-yellow-600' };
+                                default:
+                                  return { icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', bgColor: 'bg-gray-100', textColor: 'text-gray-600' };
+                              }
+                            };
 
-                          const getActivityMessage = (log) => {
-                            const version = log.details?.version_number || 'unknown';
-                            switch (log.action) {
-                              case 'create':
-                                if (log.resource_type === 'document_version') {
-                                  return `New version ${version} uploaded`;
-                                }
-                                return `Document created`;
-                              case 'rollback':
-                                return `Document rolled back to version ${version}`;
-                              default:
-                                return log.resource_name || `${log.action} ${log.resource_type}`;
-                            }
-                          };
+                            const getActivityMessage = (log) => {
+                              const version = log.details?.version_number || 'unknown';
+                              switch (log.action) {
+                                case 'create':
+                                  if (log.resource_type === 'document_version') {
+                                    return `New version ${version} uploaded`;
+                                  }
+                                  return `Document created`;
+                                case 'rollback':
+                                  return `Document rolled back to version ${version}`;
+                                default:
+                                  return log.resource_name || `${log.action} ${log.resource_type}`;
+                              }
+                            };
 
-                          const activity = getActivityIcon(log.action);
-                          
-                          return (
-                            <div key={log.id} className="flex items-start space-x-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/60 hover:shadow-md transition-all">
-                              <div className={`w-10 h-10 ${activity.bgColor} rounded-full flex items-center justify-center shadow-sm`}>
-                                <svg className={`w-5 h-5 ${activity.textColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={activity.icon} />
-                                </svg>
+                            const activity = getActivityIcon(log.action);
+
+                            return (
+                              <div key={log.id} className="flex items-start space-x-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/60 hover:shadow-md transition-all">
+                                <div className={`w-10 h-10 ${activity.bgColor} rounded-full flex items-center justify-center shadow-sm`}>
+                                  <svg className={`w-5 h-5 ${activity.textColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={activity.icon} />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <p className="text-slate-900 font-semibold">{getActivityMessage(log)}</p>
+                                  <p className="text-slate-500 text-sm">{new Date(log.timestamp).toLocaleString()}</p>
+                                  {log.user && (
+                                    <p className="text-slate-400 text-xs">by {log.user.email}</p>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-slate-900 font-semibold">{getActivityMessage(log)}</p>
-                                <p className="text-slate-500 text-sm">{new Date(log.timestamp).toLocaleString()}</p>
-                                {log.user && (
-                                  <p className="text-slate-400 text-xs">by {log.user.email}</p>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })
                       ) : (
                         <div className="text-center py-8 text-gray-500">
                           <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -691,7 +644,7 @@ export default function DocumentDetailPage() {
           </section>
 
           {/* Sidebar */}
-          <aside className="space-y-6">
+          <aside className="space-y-6 flex flex-col lg:w-1/3">
             {/* Quick Actions */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-6 hover:shadow-xl transition-all duration-300">
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-3">
@@ -743,7 +696,7 @@ export default function DocumentDetailPage() {
                       <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      <span className="font-semibold">Upload New Version</span>
+                      <span className="font-semibold whitespace-nowrap">Upload New Version</span>
                     </div>
                     <svg className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -786,7 +739,7 @@ export default function DocumentDetailPage() {
                     </button>
                   </>
                 )}
-                
+
                 {/* Show basic info for non-owners */}
                 {!isOwner && (
                   <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/50">
@@ -811,7 +764,7 @@ export default function DocumentDetailPage() {
         onClose={() => setShowVersionHistoryModal(false)}
         isOwner={isOwner}
       />
-      
+
       {isOwner && (
         <NewVersionModal
           document={document}
