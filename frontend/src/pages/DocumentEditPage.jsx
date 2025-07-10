@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI, tagsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
+import NewVersionModal from '../components/NewVersionModal';
 
 export default function DocumentEditPage() {
   const { id } = useParams();
@@ -20,6 +21,7 @@ export default function DocumentEditPage() {
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [filteredTagSuggestions, setFilteredTagSuggestions] = useState([]);
   const [originalTags, setOriginalTags] = useState([]);
+  const [showNewVersionModal, setShowNewVersionModal] = useState(false);
 
   // Fetch document data
   const { data: document, isLoading: documentLoading, error: documentError } = useQuery({
@@ -136,7 +138,6 @@ export default function DocumentEditPage() {
       toast.error('Document title is required');
       return;
     }
-
     setIsSaving(true);
     try {
       // 1. For tags without id, check if they exist in availableTags (by key/value)
@@ -145,7 +146,6 @@ export default function DocumentEditPage() {
         const found = (availableTags || []).find(t => t.key === tag.key && t.value === tag.value);
         return found ? found : tag;
       });
-      
       // 2. Create only tags that still have no id
       const newTagsToCreate = tagsWithIds.filter(tag => !tag.id);
       const createdTagObjs = [];
@@ -157,13 +157,11 @@ export default function DocumentEditPage() {
           toast.error(`Failed to create tag: ${tag.key}`);
         }
       }
-      
       // 3. Merge all tags (existing, found, and newly created)
       const allTags = [
         ...tagsWithIds.filter(tag => tag.id),
         ...createdTagObjs,
       ];
-      
       // 4. Remove duplicates (by id or key/value)
       const uniqueTags = [];
       const seen = new Set();
@@ -174,33 +172,21 @@ export default function DocumentEditPage() {
           seen.add(tagKey);
         }
       }
-      
       setTags(uniqueTags); // update state for UI
-      
       // 5. Collect all tag IDs
       const allTagIds = uniqueTags.map(tag => tag.id).filter(Boolean);
-      
-      // 6. Update document with all tag IDs - this will sync to S3 automatically via backend
+      // 6. Always update document to force backend S3 sync, even if only tags changed
       await documentsAPI.updateDocument(id, {
         title,
         description,
         content,
         status,
         tag_ids: allTagIds,
+        force_s3_tag_sync: true, // backend should respect this for forced S3 sync
       });
-      
       setIsSaving(false);
-      
-      // Show different messages based on what was updated
-      if (tagsChanged()) {
-        toast.success('Document updated successfully! Tags have been synced to AWS S3.');
-      } else {
-        toast.success('Document metadata updated successfully!');
-      }
-      
+      toast.success('Document updated and tags synced to AWS S3!');
       queryClient.invalidateQueries({ queryKey: ['document', id] });
-      
-      // Update original tags to new state
       setOriginalTags(uniqueTags);
     } catch (err) {
       setIsSaving(false);
@@ -267,6 +253,30 @@ export default function DocumentEditPage() {
                 Back to Document
               </Link>
             </div>
+            
+            {/* Upload New Version Button */}
+            <button
+              onClick={() => setShowNewVersionModal(true)}
+              className="w-full flex items-center justify-between p-4 bg-green-50/70 hover:bg-green-100/70 rounded-xl transition-all text-left text-green-700 group border border-green-200/50 hover:shadow-md mb-6"
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="font-semibold">Upload New Version</span>
+              </div>
+              <svg className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            {/* NewVersionModal */}
+            {showNewVersionModal && (
+              <NewVersionModal
+                document={document}
+                isOpen={showNewVersionModal}
+                onClose={() => setShowNewVersionModal(false)}
+              />
+            )}
             
             {/* Document Information Section */}
             <div className="space-y-6">
