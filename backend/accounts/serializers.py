@@ -49,11 +49,21 @@ class UserLoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if email and password:
+            # First, try to find the user to check if they exist and are active
+            try:
+                user_obj = User.objects.get(email=email)
+                # Check if user is inactive first, before authentication
+                if not user_obj.is_active:
+                    raise serializers.ValidationError('Your account has been deactivated by an administrator. Please contact support for assistance.')
+            except User.DoesNotExist:
+                # User doesn't exist, we'll let the authenticate function handle this
+                pass
+            
+            # Now try to authenticate
             user = authenticate(username=email, password=password)
             if not user:
                 raise serializers.ValidationError('Invalid credentials')
-            if not user.is_active:
-                raise serializers.ValidationError('User account is disabled')
+            
             attrs['user'] = user
         else:
             raise serializers.ValidationError('Must include email and password')

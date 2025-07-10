@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '../services/axios';
 import { auditAPI } from '../services/api';
-import mammoth from 'mammoth';
 import VersionHistoryModal from '../components/VersionHistoryModal';
 import NewVersionModal from '../components/NewVersionModal';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -96,13 +95,13 @@ const FileTypeSVG = ({ fileType, className = "w-8 h-8" }) => {
     case 'DOCX':
     case 'DOC':
       return (
-        className = "w-16 h-16 mt-10",
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 512 512"
           width="100"
           height="100"
           fill="none"
+          className="w-16 h-16 mt-10"
         >
           <path
             d="M128 0H320L480 148.5V480C480 497.7 465.7 512 448 512H128C110.3 512 96 497.7 96 480V32C96 14.3 110.3 0 128 0Z"
@@ -205,7 +204,6 @@ export default function DocumentDetailPage() {
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [currentUser, setCurrentUser] = useState(null);
-  const [docxHtml, setDocxHtml] = useState(null);
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [pdfPageWidth, setPdfPageWidth] = useState(800);
   const pdfContainerRef = useRef(null);
@@ -301,28 +299,33 @@ export default function DocumentDetailPage() {
     try {
       const response = await apiClient.get(`/documents/${id}/download/`);
       const downloadUrl = response.data.download_url;
-      if (document.file_type && ['PDF', 'pdf'].includes(document.file_type)) {
+      const fileType = document.file_type?.toLowerCase();
+      
+      if (fileType === 'pdf') {
         // Open PDF in a new browser tab instead of modal
         window.open(downloadUrl, '_blank');
         return;
-      } else if (document.file_type && ['DOCX', 'docx'].includes(document.file_type)) {
-        // Fetch DOCX as ArrayBuffer and convert to HTML
-        const docxResponse = await fetch(downloadUrl);
-        const arrayBuffer = await docxResponse.arrayBuffer();
-        const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-        setDocxHtml(html);
-        setDocumentContent(null);
-      } else if (document.file_type && ['JPG', 'JPEG', 'PNG', 'GIF', 'jpg', 'jpeg', 'png', 'gif'].includes(document.file_type)) {
+      } else if (fileType === 'docx' || fileType === 'doc') {
+        // Open DOCX/DOC files in Google Docs viewer in a new tab
+        const googleDocsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(downloadUrl)}&embedded=true`;
+        window.open(googleDocsViewerUrl, '_blank');
+        return;
+      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
         setDocumentContent(downloadUrl);
-        setDocxHtml(null);
-      } else {
+        setShowDocumentViewer(true);
+      } else if (['txt', 'md', 'csv', 'json', 'xml', 'log'].includes(fileType)) {
+        // Handle text files
         const contentResponse = await fetch(downloadUrl);
         const content = await contentResponse.text();
         setDocumentContent(content);
-        setDocxHtml(null);
+        setShowDocumentViewer(true);
+      } else {
+        // For unsupported file types, just download
+        handleDownload();
       }
-      setShowDocumentViewer(true);
     } catch (error) {
+      console.error('Error viewing document:', error);
+      // Fallback to download if viewing fails
       handleDownload();
     }
   };
@@ -775,6 +778,61 @@ export default function DocumentDetailPage() {
           isOpen={showNewVersionModal}
           onClose={() => setShowNewVersionModal(false)}
         />
+      )}
+
+      {/* Document Viewer Modal */}
+      {showDocumentViewer && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowDocumentViewer(false)}>
+          <div className="bg-white rounded-lg max-w-6xl max-h-[90vh] w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">{document.title}</h3>
+              <button
+                onClick={() => setShowDocumentViewer(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+              {documentContent && (
+                <>
+                  {document.file_type && ['JPG', 'JPEG', 'PNG', 'GIF', 'jpg', 'jpeg', 'png', 'gif'].includes(document.file_type) ? (
+                    <img 
+                      src={documentContent} 
+                      alt={document.title}
+                      className="max-w-full h-auto mx-auto"
+                    />
+                  ) : (
+                    <pre className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-4 rounded-lg overflow-auto">
+                      {documentContent}
+                    </pre>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end p-4 border-t border-gray-200 space-x-3">
+              <button
+                onClick={handleDownload}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Download
+              </button>
+              <button
+                onClick={() => setShowDocumentViewer(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

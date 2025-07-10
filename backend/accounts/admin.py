@@ -47,9 +47,9 @@ class InviteUserForm(forms.Form):
 class UserAdmin(BaseUserAdmin):
     """Enhanced admin configuration for User model with management features"""
     list_display = (
-        'email', 'username', 'full_name', 'is_mfa_enabled', 
+        'email', 'username', 'full_name', 'job_title', 'is_mfa_enabled', 
         'is_staff', 'is_active', 'documents_count', 'storage_usage',
-        'last_login', 'created_at', 'user_actions'
+        'last_login', 'created_at'
     )
     list_filter = (
         'is_staff', 'is_active', 'is_mfa_enabled', 'created_at', 
@@ -85,7 +85,7 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
     
-    actions = ['activate_users', 'deactivate_users', 'reset_mfa']
+    actions = ['reset_mfa', 'activate_users', 'deactivate_users']
 
     def get_urls(self):
         """Add custom URLs for admin actions"""
@@ -204,31 +204,17 @@ class UserAdmin(BaseUserAdmin):
         return f"{recent_logs} actions (7 days)"
     recent_activity.short_description = 'Recent Activity'
 
-    def user_actions(self, obj):
-        """Display action buttons for user management"""
-        actions = []
-        
-        if obj.is_active:
-            actions.append(
-                f'<a class="button" href="#" onclick="deactivateUser({obj.pk})">Deactivate</a>'
-            )
-        else:
-            actions.append(
-                f'<a class="button" href="#" onclick="activateUser({obj.pk})">Activate</a>'
-            )
-            
-        actions.append(
-            f'<a class="button" href="#" onclick="sendInvitation({obj.pk})">Send Invitation</a>'
-        )
-        
-        if obj.is_mfa_enabled:
-            actions.append(
-                f'<a class="button" href="#" onclick="resetMFA({obj.pk})">Reset MFA</a>'
-            )
-            
-        return format_html(' '.join(actions))
-    user_actions.short_description = 'Actions'
-    user_actions.allow_tags = True
+    def activate_users(self, request, queryset):
+        """Activate selected users"""
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f'Successfully activated {updated} users.')
+    activate_users.short_description = "Activate selected users"
+
+    def deactivate_users(self, request, queryset):
+        """Deactivate selected users"""
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f'Successfully deactivated {updated} users.')
+    deactivate_users.short_description = "Deactivate selected users"
 
     def get_queryset(self, request):
         """Optimize queryset with annotations"""
@@ -238,61 +224,16 @@ class UserAdmin(BaseUserAdmin):
         )
         return queryset
 
-    def activate_users(self, request, queryset):
-        """Bulk action to activate users"""
-        updated = queryset.update(is_active=True)
-        self.message_user(
-            request,
-            f'Successfully activated {updated} user(s).',
-            messages.SUCCESS
-        )
-    activate_users.short_description = "Activate selected users"
-
-    def deactivate_users(self, request, queryset):
-        """Bulk action to deactivate users"""
-        updated = queryset.update(is_active=False)
-        self.message_user(
-            request,
-            f'Successfully deactivated {updated} user(s).',
-            messages.SUCCESS
-        )
-    deactivate_users.short_description = "Deactivate selected users"
-
-    def send_invitation(self, request, queryset):
-        """Bulk action to send invitations"""
-        count = 0
-        for user in queryset:
-            # Generate invitation token
-            token = user.generate_password_reset_token()
-            # Here you would normally send an email
-            # For now, we'll just create an audit log
-            from audit.models import AuditLog
-            AuditLog.log_activity(
-                user=request.user,
-                action='create',
-                resource_type='invitation',
-                resource_id=user.id,
-                resource_name=user.email,
-                details={'invitation_token': token},
-                request=request
-            )
-            count += 1
-            
-        self.message_user(
-            request,
-            f'Successfully sent invitations to {count} user(s).',
-            messages.SUCCESS
-        )
-    send_invitation.short_description = "Send invitation to selected users"
-
     def reset_mfa(self, request, queryset):
         """Bulk action to reset MFA for users"""
-        updated = queryset.update(
-            is_mfa_enabled=False,
-            mfa_code=None,
-            mfa_code_expires=None,
-            mfa_backup_codes=None
-        )
+        updated = 0
+        for user in queryset:
+            user.is_mfa_enabled = False
+            user.mfa_secret = ''
+            user.mfa_backup_codes = []
+            user.save()
+            updated += 1
+        
         self.message_user(
             request,
             f'Successfully reset MFA for {updated} user(s).',

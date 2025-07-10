@@ -203,14 +203,16 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 ml-4">
-                      {/* Download button - always visible */}
-                      <button
-                        onClick={() => handleDownload(version)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <Download size={16} />
-                        Download
-                      </button>
+                      {/* Download button - only visible for owners */}
+                      {isOwner && (
+                        <button
+                          onClick={() => handleDownload(version)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <Download size={16} />
+                          Download
+                        </button>
+                      )}
                       
                       {/* Rollback button - only for owners on non-current versions */}
                       {!version.is_current && isOwner && (

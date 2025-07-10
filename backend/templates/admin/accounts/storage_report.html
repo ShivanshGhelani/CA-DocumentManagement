@@ -12,14 +12,12 @@
 {% endblock %}
 
 {% block content %}
-<div id="content-main">
-    <h1>Storage Usage Report</h1>
-    
+<div id="content-main">    
     <div class="module">
-        <h2>Summary</h2>
+        <h2 style="color: rgba(0, 0, 0, 0.671);"><strong>Summary</strong></h2>
         <div class="form-row">
-            <p><strong>Total Active Users:</strong> {{ total_users }}</p>
-            <p><strong>Total Storage Used:</strong> 
+            <p style="color: black;"><strong>Total Active Users:</strong> {{ total_users }}</p>
+            <p style="color:black" ><strong>Total Storage Used:</strong> 
                 {% if total_storage %}
                     {{ total_storage|filesizeformat }}
                 {% else %}
@@ -48,7 +46,7 @@
                     {% for user in users_storage %}
                         <tr>
                             <td>
-                                <a href="{% url 'admin:accounts_user_change' user.pk %}">
+                                <a style="color: rgb(0, 119, 255);" href="{% url 'admin:accounts_user_change' user.pk %}">
                                     {{ user.get_full_name|default:user.username }}
                                 </a>
                             </td>
@@ -94,18 +92,57 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
+    background-color: white;
 }
 table th, table td {
     border: 1px solid #ddd;
-    padding: 8px;
+    padding: 12px 8px;
     text-align: left;
 }
 table th {
-    background-color: #f2f2f2;
+    background-color: #417690;
+    color: rgb(255, 255, 255);
     font-weight: bold;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+table tr:nth-child(odd) {
+    background-color: #f9f9f9;
 }
 table tr:nth-child(even) {
-    background-color: #f9f9f9;
+    background-color: #ffffff;
+}
+table tr:hover {
+    background-color: #e8f4f8;
+    cursor: pointer;
+}
+table td {
+    font-size: 13px;
+    color: #333;
+}
+table td a {
+    color: #417690;
+    text-decoration: none;
+    font-weight: 500;
+}
+table td a:hover {
+    color: #2c5aa0;
+    text-decoration: underline;
+}
+.module {
+    margin-bottom: 20px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.module h2 {
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+    margin: 0;
+    padding: 10px 15px;
+    font-size: 14px;
+    color: #333;
 }
 </style>
 {% endblock %}
