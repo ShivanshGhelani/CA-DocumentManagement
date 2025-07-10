@@ -34,10 +34,12 @@ const NewVersionModal = ({ document, isOpen, onClose }) => {
   const createVersionMutation = useMutation({
     mutationFn: (data) => documentsAPI.createDocumentVersion(document.id, data),
     onSuccess: () => {
+      // Invalidate all related queries to ensure UI updates with new version details
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['document', document.id] });
       queryClient.invalidateQueries({ queryKey: ['document-versions', document.id] });
       queryClient.invalidateQueries({ queryKey: ['document-audit', document.id] });
+      queryClient.invalidateQueries({ queryKey: ['document-metadata', document.id] });
       onClose();
       resetForm();
     },

@@ -156,13 +156,20 @@ class Document(models.Model):
             self.updated_at = timezone.now()
             self.save()
             
-            # Create audit log for rollback
-            DocumentAuditLog.objects.create(
-                document=self,
-                action='rollback',
-                performed_by=user,
-                details=f"Rolled back to version {version.version_number}",
-                version=version
+            # Create audit log for rollback using the main AuditLog
+            from audit.models import AuditLog
+            AuditLog.log_activity(
+                user=user,
+                action="rollback",
+                resource_type="document",
+                resource_id=str(self.id),
+                resource_name=self.title,
+                details={
+                    "version_id": str(version_id),
+                    "version_number": version.version_number,
+                    "reason": f"Rolled back to version {version.version_number}"
+                },
+                content_object=self,
             )
             return True, "Successfully rolled back"
         except DocumentVersion.DoesNotExist:
@@ -207,13 +214,20 @@ class Document(models.Model):
         self.updated_at = timezone.now()
         self.save()
         
-        # Create audit log
-        DocumentAuditLog.objects.create(
-            document=self,
-            action='version_created',
-            performed_by=user,
-            details=f"Created version {new_version_number}",
-            version=new_version
+        # Create audit log using the main AuditLog
+        from audit.models import AuditLog
+        AuditLog.log_activity(
+            user=user,
+            action="create",
+            resource_type="document_version",
+            resource_id=str(new_version.id),
+            resource_name=f"{self.title} v{new_version_number}",
+            details={
+                "document_id": str(self.id),
+                "version_number": new_version_number,
+                "reason": metadata.get('reason', '')
+            },
+            content_object=new_version,
         )
         
         return new_version, "Version created successfully"

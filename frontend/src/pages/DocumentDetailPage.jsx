@@ -39,18 +39,9 @@ const formatFileSize = (size) => {
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
 };
-const fetchDocumentVersions = async (id) => {
-  const { data } = await apiClient.get(`/documents/${id}/versions/`);
-  return data;
-};
 
 const deleteDocument = async (id) => {
   await apiClient.delete(`/documents/${id}/`);
-};
-
-const rollbackDocument = async ({ id, versionId }) => {
-  const { data } = await apiClient.post(`/documents/${id}/rollback/`, { version_id: versionId });
-  return data;
 };
 
 // Status Badge Component
@@ -209,7 +200,6 @@ export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showVersions, setShowVersions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentContent, setDocumentContent] = useState(null);
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
@@ -282,11 +272,6 @@ export default function DocumentDetailPage() {
     queryKey: ['document', id],
     queryFn: () => fetchDocument(id)
   });
-  const { data: versions } = useQuery({
-    queryKey: ['document-versions', id],
-    queryFn: () => fetchDocumentVersions(id),
-    enabled: showVersions
-  });
 
   // Fetch audit logs for this document
   const { data: auditLogs } = useQuery({
@@ -303,13 +288,6 @@ export default function DocumentDetailPage() {
       // Refresh tags list to remove tags of deleted document
       queryClient.invalidateQueries(['tags']);
       navigate('/documents');
-    }
-  });
-  const rollbackMutation = useMutation({
-    mutationFn: rollbackDocument,
-    onSuccess: () => {
-      refetch();
-      setShowVersions(false);
     }
   });
 
@@ -349,10 +327,6 @@ export default function DocumentDetailPage() {
     }
   };
 
-  const handleRollback = (versionId) => {
-    rollbackMutation.mutate({ id, versionId });
-  };
-
   const handleDeleteClick = () => {
     setShowDeleteModal(true);
   };
@@ -361,9 +335,6 @@ export default function DocumentDetailPage() {
     deleteMutation.mutate(id);
     setShowDeleteModal(false);
   };
-
-  // Always use an array for versions
-  const safeVersions = Array.isArray(versions) ? versions : (versions?.results || []);
 
   if (isLoading) {
     return (
@@ -660,7 +631,16 @@ export default function DocumentDetailPage() {
                     </h3>
                     <div className="space-y-4">
                       {auditLogs?.results?.length > 0 ? (
-                        auditLogs.results.slice(0, 10).map((log) => {
+                        auditLogs.results
+                          .filter((log) => {
+                            // Show only key document events: create, new version, rollback
+                            const isDocumentCreation = log.action === 'create' && log.resource_type === 'document';
+                            const isVersionUpload = log.action === 'create' && log.resource_type === 'document_version';
+                            const isRollback = log.action === 'rollback';
+                            return isDocumentCreation || isVersionUpload || isRollback;
+                          })
+                          .slice(0, 10)
+                          .map((log) => {
                           const getActivityIcon = (action) => {
                             switch (action) {
                               case 'create':
@@ -681,13 +661,11 @@ export default function DocumentDetailPage() {
                             switch (log.action) {
                               case 'create':
                                 if (log.resource_type === 'document_version') {
-                                  return `Document updated to new version ${version}`;
+                                  return `New version ${version} uploaded`;
                                 }
                                 return `Document created`;
                               case 'rollback':
                                 return `Document rolled back to version ${version}`;
-                              case 'download':
-                                return 'Document downloaded';
                               default:
                                 return log.resource_name || `${log.action} ${log.resource_type}`;
                             }
@@ -754,23 +732,25 @@ export default function DocumentDetailPage() {
                   </svg>
                 </button>
 
+                {/* Version History - visible to all users */}
+                <button
+                  onClick={() => setShowVersionHistoryModal(true)}
+                  className="w-full flex items-center justify-between p-4 bg-purple-50/70 hover:bg-purple-100/70 rounded-xl transition-all text-left text-purple-700 group border border-purple-200/50 hover:shadow-md"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-semibold">Version History</span>
+                  </div>
+                  <svg className="w-4 h-4 text-purple-400 group-hover:text-purple-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
                 {/* Owner-only actions */}
                 {isOwner && (
                   <>
-                    <button
-                      onClick={() => setShowVersionHistoryModal(true)}
-                      className="w-full flex items-center justify-between p-4 bg-purple-50/70 hover:bg-purple-100/70 rounded-xl transition-all text-left text-purple-700 group border border-purple-200/50 hover:shadow-md"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-semibold">Version History</span>
-                      </div>
-                      <svg className="w-4 h-4 text-purple-400 group-hover:text-purple-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
 
                     <button
                       onClick={() => setShowNewVersionModal(true)}
@@ -835,197 +815,6 @@ export default function DocumentDetailPage() {
           </aside>
         </div>
       </div>
-
-      {/* Version History Modal */}
-      {showVersions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-2xl">
-              <h3 className="text-xl font-semibold text-gray-900">Version History</h3>
-              <button
-                onClick={() => setShowVersions(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto bg-gray-50">
-              {safeVersions && (
-                <div className="space-y-3">
-                  {safeVersions.map((version) => (
-                    <div key={version.version_id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300">
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-slate-900">Version {version.version_id}</span>
-                          {version.version_id === document.version && (
-                            <span className="bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full font-medium shadow-sm">Current</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-2 text-sm text-slate-600">
-                          <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center shadow-sm">
-                            <span className="text-xs font-medium text-slate-600">
-                              {(version.created_by?.first_name?.charAt(0) || '') + (version.created_by?.last_name?.charAt(0) || '') || 'U'}
-                            </span>
-                          </div>
-                          <span>{version.created_by}</span>
-                          <span className="text-slate-400">•</span>
-                          <span>{new Date(version.created_at).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      {version.version_id !== document.version && isOwner && (
-                        <button
-                          onClick={() => handleRollback(version.version_id)}
-                          disabled={rollbackMutation.isLoading}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium shadow-sm"
-                        >
-                          {rollbackMutation.isLoading ? 'Rolling back...' : 'Rollback'}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Document Viewer Modal */}
-      {showDocumentViewer && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full h-5/6 flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-2xl">
-              <h3 className="text-xl font-semibold text-gray-900 truncate">{document?.title}</h3>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleDownload}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                >
-                  Download
-                </button>
-                <button
-                  onClick={() => setShowDocumentViewer(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 min-h-0 overflow-hidden bg-gray-50">
-              {document?.file_type && ['PDF', 'pdf'].includes(document.file_type) && documentContent ? (
-                <div className="flex-1 min-h-0 flex justify-center items-center w-full h-full p-6 overflow-auto">
-                  <div
-                    className="bg-white rounded-lg shadow-sm max-w-full w-full flex justify-center items-center min-h-0 flex-1"
-                    style={{ height: '100%' }}
-                  >
-                    {/* Responsive PDF viewer */}
-                    <PDFResponsiveViewer
-                      PDFDocument={PDFDocument}
-                      Page={Page}
-                      file={documentContent}
-                      pdfLoaded={pdfLoaded}
-                    />
-                  </div>
-                </div>
-              ) : document?.file_type && ['DOCX', 'docx'].includes(document.file_type) && docxHtml ? (
-                <div className="h-full overflow-auto p-6">
-                  <div
-                    className="bg-white rounded-lg p-8 shadow-sm prose prose-lg max-w-none mx-auto"
-                    style={{
-                      fontFamily: 'system-ui, -apple-system, sans-serif',
-                      lineHeight: '1.6',
-                      color: '#374151'
-                    }}
-                    dangerouslySetInnerHTML={{ __html: docxHtml }}
-                  />
-                </div>
-              ) : document?.file_type && ['JPG', 'JPEG', 'PNG', 'GIF', 'jpg', 'jpeg', 'png', 'gif'].includes(document.file_type) && documentContent ? (
-                <div className="h-full flex items-center justify-center p-6 overflow-auto">
-                  <img
-                    src={documentContent}
-                    alt={document.title}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-md"
-                  />
-                </div>
-              ) : documentContent ? (
-                <div className="h-full overflow-auto p-6">
-                  <div className="bg-white rounded-lg p-8 shadow-sm">
-                    <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono leading-relaxed overflow-auto">
-                      {documentContent}
-                    </pre>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                    <p className="text-gray-600">Loading document content...</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4 shadow-sm">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete Document</h3>
-                  <p className="text-sm text-gray-500">This action cannot be undone</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 bg-white">
-              <p className="text-gray-700">
-                Are you sure you want to delete <span className="font-semibold">"{document?.title}"</span>?
-                This will permanently remove the document and all its versions.
-              </p>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 bg-gray-50 rounded-b-2xl">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleteMutation.isLoading}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleteMutation.isLoading}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-lg transition-colors font-medium flex items-center shadow-sm"
-              >
-                {deleteMutation.isLoading ? (
-                  <>
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete Document
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Version Management Modals */}
       <VersionHistoryModal

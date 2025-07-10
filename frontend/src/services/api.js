@@ -264,6 +264,12 @@ export const documentsAPI = {
     return response.data;
   },
 
+  // Delete specific document version
+  deleteDocumentVersion: async (documentId, versionId) => {
+    const response = await apiClient.delete(`/documents/${documentId}/versions/${versionId}/delete/`);
+    return response.data;
+  },
+
   // Get document metadata for version creation
   getDocumentMetadata: async (documentId) => {
     const response = await apiClient.get(`/documents/${documentId}/metadata/`);

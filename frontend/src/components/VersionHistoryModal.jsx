@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentsAPI } from '../services/api';
-import { Clock, Download, RotateCcw, FileText, Tag, X } from 'lucide-react';
+import { Clock, Download, RotateCcw, FileText, Tag, X, Trash2 } from 'lucide-react';
 
 const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => {
   const queryClient = useQueryClient();
@@ -17,14 +17,31 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
     mutationFn: ({ documentId, versionId }) => 
       documentsAPI.rollbackDocument(documentId, versionId),
     onSuccess: () => {
+      // Invalidate all related queries to ensure UI updates with rollback details
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['document', document.id] });
+      queryClient.invalidateQueries({ queryKey: ['document-versions', document.id] });
       queryClient.invalidateQueries({ queryKey: ['document-audit', document.id] });
+      queryClient.invalidateQueries({ queryKey: ['document-metadata', document.id] });
       onClose();
     },
     onError: (error) => {
       console.error('Rollback error:', error);
       alert('Failed to rollback document. Please try again.');
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ documentId, versionId }) => 
+      documentsAPI.deleteDocumentVersion(documentId, versionId),
+    onSuccess: () => {
+      // Invalidate queries to refresh version list
+      queryClient.invalidateQueries({ queryKey: ['document-versions', document.id] });
+      queryClient.invalidateQueries({ queryKey: ['document-audit', document.id] });
+    },
+    onError: (error) => {
+      console.error('Delete error:', error);
+      alert('Failed to delete version. ' + (error.response?.data?.detail || 'Please try again.'));
     }
   });
 
@@ -37,8 +54,37 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
     }
   };
 
+  const handleDelete = (version) => {
+    if (window.confirm(`Are you sure you want to delete version ${version.version_number}? This action cannot be undone.`)) {
+      deleteMutation.mutate({
+        documentId: document.id,
+        versionId: version.id
+      });
+    }
+  };
+
   const handleDownload = (version) => {
-    window.open(version.download_url, '_blank');
+    if (version.download_url) {
+      window.open(version.download_url, '_blank');
+    } else {
+      // Fallback to API call if download_url is not available
+      documentsAPI.downloadDocumentVersion(document.id, version.id)
+        .then(response => {
+          // Create blob URL and download
+          const url = window.URL.createObjectURL(response);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${version.title || document.title}_v${version.version_number}`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        })
+        .catch(error => {
+          console.error('Download error:', error);
+          alert('Failed to download document version. Please try again.');
+        });
+    }
   };
 
   const formatFileSize = (bytes) => {
@@ -157,6 +203,7 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 ml-4">
+                      {/* Download button - always visible */}
                       <button
                         onClick={() => handleDownload(version)}
                         className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -164,6 +211,8 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
                         <Download size={16} />
                         Download
                       </button>
+                      
+                      {/* Rollback button - only for owners on non-current versions */}
                       {!version.is_current && isOwner && (
                         <button
                           onClick={() => handleRollback(version)}
@@ -172,6 +221,18 @@ const VersionHistoryModal = ({ document, isOpen, onClose, isOwner = false }) => 
                         >
                           <RotateCcw size={16} />
                           Rollback
+                        </button>
+                      )}
+
+                      {/* Delete button - only for owners on non-current versions */}
+                      {!version.is_current && isOwner && (
+                        <button
+                          onClick={() => handleDelete(version)}
+                          disabled={deleteMutation.isLoading}
+                          className="flex items-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={16} />
+                          Delete
                         </button>
                       )}
                     </div>

@@ -675,12 +675,14 @@ def document_version_history(request, pk):
     
     # Check if user has permission to view document
     if document.created_by != request.user:
-        access = document.access_permissions.filter(
-            user=request.user,
-            permission__in=['read', 'write', 'admin']
-        ).first()
-        if not access:
-            return Response({"detail": "You do not have permission to view this document."}, status=403)
+        # Allow access if document is published OR user has explicit permissions
+        if document.status != 'published':
+            access = document.access_permissions.filter(
+                user=request.user,
+                permission__in=['read', 'write', 'admin']
+            ).first()
+            if not access:
+                return Response({"detail": "You do not have permission to view this document."}, status=403)
     
     versions = document.versions.all().order_by('-version_number')
     serializer = DocumentVersionHistorySerializer(versions, many=True, context={'request': request})
@@ -852,3 +854,63 @@ def get_document_metadata_for_version(request, pk):
         'tags': TagSerializer(document.tags.all(), many=True).data,
         'current_version': document.current_version.version_number if document.current_version else 0
     })
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_document_version(request, pk, version_id):
+    """Delete a specific version of a document (owner only)"""
+    try:
+        document = Document.objects.get(pk=pk)
+        version = document.versions.get(id=version_id)
+    except (Document.DoesNotExist, DocumentVersion.DoesNotExist):
+        return Response({"detail": "Document or version not found."}, status=404)
+    
+    # Check if user is the document owner
+    if document.created_by != request.user:
+        return Response({"detail": "Only the document owner can delete versions."}, status=403)
+    
+    # Prevent deletion of the current version
+    if document.current_version and document.current_version.id == version.id:
+        return Response({"detail": "Cannot delete the current version. Please rollback to another version first."}, status=400)
+    
+    # Prevent deletion if it's the only version
+    if document.versions.count() <= 1:
+        return Response({"detail": "Cannot delete the only remaining version."}, status=400)
+    
+    version_number = version.version_number
+    
+    # Delete the version file from S3 if it exists
+    if version.file:
+        import boto3
+        from django.conf import settings
+        s3_client = boto3.client(
+            "s3",
+            region_name=settings.AWS_S3_REGION_NAME,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        )
+        try:
+            s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=version.file.name)
+        except Exception as e:
+            # Log but don't block deletion if file is missing
+            print(f"S3 file delete error: {e}")
+    
+    # Delete the version
+    version.delete()
+    
+    # Log the deletion
+    AuditLog.log_activity(
+        user=request.user,
+        action="delete",
+        resource_type="document_version",
+        resource_id=str(version_id),
+        resource_name=f"{document.title} v{version_number}",
+        details={
+            "document_id": str(document.id),
+            "version_number": version_number,
+            "reason": "Version deleted by owner"
+        },
+        request=request,
+    )
+    
+    return Response({"message": "Version deleted successfully."}, status=204)

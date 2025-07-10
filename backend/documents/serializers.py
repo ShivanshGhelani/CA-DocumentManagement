@@ -63,17 +63,20 @@ class DocumentAccessSerializer(serializers.ModelSerializer):
 class DocumentListSerializer(serializers.ModelSerializer):
     """Serializer for Document list view"""
     created_by = UserProfileSerializer(read_only=True)
-    tags = TagSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()  # Get from current version
     file_url = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     file_size = serializers.SerializerMethodField()
     file_type = serializers.SerializerMethodField()
     version_number = serializers.SerializerMethodField()
+    version = serializers.SerializerMethodField()  # Add for backward compatibility
+    title = serializers.SerializerMethodField()  # Get from current version
+    description = serializers.SerializerMethodField()  # Get from current version
     
     class Meta:
         model = Document
         fields = ('id', 'short_id', 'title', 'description', 'file_url', 'file_size', 
-                 'file_type', 'status', 'version_number', 'created_by', 'tags', 
+                 'file_type', 'status', 'version_number', 'version', 'created_by', 'tags', 
                  'created_at', 'updated_at', 'can_edit')
     
     def get_file_url(self, obj):
@@ -92,6 +95,23 @@ class DocumentListSerializer(serializers.ModelSerializer):
     
     def get_version_number(self, obj):
         return obj.version_number
+    
+    def get_version(self, obj):
+        return obj.version_number  # Same as version_number for compatibility
+    
+    def get_title(self, obj):
+        """Get title from current version, fallback to document title"""
+        return obj.current_version.title if obj.current_version else obj.title
+    
+    def get_description(self, obj):
+        """Get description from current version, fallback to document description"""
+        return obj.current_version.description if obj.current_version else obj.description
+    
+    def get_tags(self, obj):
+        """Get tags from current version, fallback to document tags"""
+        if obj.current_version:
+            return TagSerializer(obj.current_version.tags.all(), many=True).data
+        return TagSerializer(obj.tags.all(), many=True).data
     
     def get_can_edit(self, obj):
         request = self.context.get('request')
@@ -113,7 +133,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
 class DocumentDetailSerializer(serializers.ModelSerializer):
     """Serializer for Document detail view"""
     created_by = UserProfileSerializer(read_only=True)
-    tags = TagSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()  # Get from current version
     tag_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
@@ -127,14 +147,17 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     file_size = serializers.SerializerMethodField()
     file_type = serializers.SerializerMethodField()
     version_number = serializers.SerializerMethodField()
+    version = serializers.SerializerMethodField()  # Add for backward compatibility
+    title = serializers.CharField(required=False)  # Allow write for updates
+    description = serializers.CharField(required=False, allow_blank=True)  # Allow write for updates
     
     class Meta:
         model = Document
         fields = ('id', 'short_id', 'title', 'description', 'file_url', 'file_size', 
-                 'file_type', 'status', 'version_number', 'created_by', 'tags', 'tag_ids',
+                 'file_type', 'status', 'version_number', 'version', 'created_by', 'tags', 'tag_ids',
                  'versions', 'access_permissions', 'created_at', 'updated_at',
                  'can_edit', 'can_delete', 'current_version')
-        read_only_fields = ('id', 'short_id', 'file_size', 'file_type', 'version_number', 'created_by',
+        read_only_fields = ('id', 'short_id', 'file_size', 'file_type', 'version_number', 'version', 'created_by',
                            'created_at', 'updated_at', 'current_version')
     
     def get_file_url(self, obj):
@@ -153,6 +176,35 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     
     def get_version_number(self, obj):
         return obj.version_number
+    
+    def get_version(self, obj):
+        return obj.version_number  # Same as version_number for compatibility
+    
+    def get_title(self, obj):
+        """Get title from current version, fallback to document title"""
+        return obj.current_version.title if obj.current_version else obj.title
+    
+    def get_description(self, obj):
+        """Get description from current version, fallback to document description"""
+        return obj.current_version.description if obj.current_version else obj.description
+    
+    def get_tags(self, obj):
+        """Get tags from current version, fallback to document tags"""
+        if obj.current_version:
+            return TagSerializer(obj.current_version.tags.all(), many=True).data
+        return TagSerializer(obj.tags.all(), many=True).data
+    
+    def to_representation(self, instance):
+        """Override to provide custom title/description from current version"""
+        data = super().to_representation(instance)
+        # Get title and description from current version if it exists
+        if instance.current_version:
+            data['title'] = instance.current_version.title
+            data['description'] = instance.current_version.description
+        else:
+            data['title'] = instance.title
+            data['description'] = instance.description
+        return data
     
     def get_file_url(self, obj):
         if obj.file:
@@ -203,12 +255,35 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         tag_ids = validated_data.pop('tag_ids', None)
         
-        # Update only basic metadata fields (not file-related)
+        # Extract title and description to update the current version
+        title = validated_data.pop('title', None)
+        description = validated_data.pop('description', None)
+        
+        # Update non-metadata fields on the document itself
         instance = super().update(instance, validated_data)
         
+        # Update current version metadata if provided
+        if instance.current_version and (title is not None or description is not None):
+            if title is not None:
+                instance.current_version.title = title
+            if description is not None:
+                instance.current_version.description = description
+            instance.current_version.save()
+        elif title is not None or description is not None:
+            # If no current version, update document directly (fallback)
+            if title is not None:
+                instance.title = title
+            if description is not None:
+                instance.description = description
+            instance.save()
+        
+        # Handle tags - update current version tags or document tags
         if tag_ids is not None:
             tags = Tag.objects.filter(id__in=tag_ids)
-            instance.tags.set(tags)
+            if instance.current_version:
+                instance.current_version.tags.set(tags)
+            else:
+                instance.tags.set(tags)
         
         return instance
 
